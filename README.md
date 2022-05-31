@@ -9,6 +9,8 @@ a cloud deployment on Amazon Web Services to assess the number of
 distinct computing resources. The result is a CSV file that describes the counts
 of each.
 
+This repository started out as [cloud-resource-counter](https://github.com/expel-io/cloud-resource-counter). Reference the archived repository to view its entire history.
+
 **Table of Contents**
 
 * [Command Line](#command-line)
