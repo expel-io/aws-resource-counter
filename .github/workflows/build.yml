@@ -39,9 +39,10 @@ jobs:
       run: go build -v .
 
     - name: Lint
-      run: |
-        go get -u golang.org/x/lint/golint
-        golint
+      run: go vet
+      
+    - name: staticcheck
+      uses: dominikh/staticcheck-action@v1.2.0
 
     - name: Test
       run: go test -v .
