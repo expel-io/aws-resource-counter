@@ -8,25 +8,36 @@ before:
     # - go generate ./...
 builds:
   - binary: aws-resource-counter
-    id: crc-others
+    id: arc-others
     goos:
       - linux
   - binary: aws-resource-counter
-    id: crc-macos
+    id: arc-macos
     goos:
       - darwin
     goarch:
       - amd64
       - arm64
     hooks:
-      post: gon gon.hcl
+      post:
+        - |
+          sh -c '
+          cat > /tmp/arc-{{ .Arch }}-gon.hcl <<EOF
+          source = ["./dist/arc-macos_{{ .Target }}/{{ .Name }}"]
+          bundle_id = "com.expel.aws-resource-counter"
+          sign {
+            application_identity = "71c685df24be2279027ca972134afd5c715ed841"
+          }
+          EOF
+          '
+        - "gon /tmp/arc-{{ .Arch }}-gon.hcl"
 archives:
-  - replacements:
-      darwin: Darwin
-      linux: Linux
-      windows: Windows
-      386: i386
-      amd64: x86_64
+  - name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
 checksum:
   name_template: 'checksums.txt'
 snapshot:
