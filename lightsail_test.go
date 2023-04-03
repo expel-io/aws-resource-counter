@@ -24,13 +24,13 @@ import (
 // This is our list of accessible regions for the purpose of unit testing.
 var lightsailRegions *lightsail.GetRegionsOutput = &lightsail.GetRegionsOutput{
 	Regions: []*lightsail.Region{
-		&lightsail.Region{
+		{
 			Name: aws.String("us-east-1"),
 		},
-		&lightsail.Region{
+		{
 			Name: aws.String("us-east-2"),
 		},
-		&lightsail.Region{
+		{
 			Name: aws.String("eu-west-1"),
 		},
 	},
@@ -40,21 +40,21 @@ var lightsailRegions *lightsail.GetRegionsOutput = &lightsail.GetRegionsOutput{
 var lightsailInstancesPerRegion = map[string]*lightsail.GetInstancesOutput{
 	// US-EAST-1 simulates a region where there are three Lightsail instances:
 	// one is Wordpress, one is Magento (but it is stopped) and the other is Node.js.
-	"us-east-1": &lightsail.GetInstancesOutput{
+	"us-east-1": {
 		Instances: []*lightsail.Instance{
-			&lightsail.Instance{
+			{
 				Name: aws.String("WordPress-1"),
 				State: &lightsail.InstanceState{
 					Name: aws.String("running"),
 				},
 			},
-			&lightsail.Instance{
+			{
 				Name: aws.String("Magento-1"),
 				State: &lightsail.InstanceState{
 					Name: aws.String("pending"),
 				},
 			},
-			&lightsail.Instance{
+			{
 				Name: aws.String("Node-js-1"),
 				State: &lightsail.InstanceState{
 					Name: aws.String("running"),
@@ -63,18 +63,18 @@ var lightsailInstancesPerRegion = map[string]*lightsail.GetInstancesOutput{
 		},
 	},
 	// US-EAST-2 has no instances...
-	"us-east-2": &lightsail.GetInstancesOutput{},
+	"us-east-2": {},
 
 	// EU-WEST-1 has 2 instances (only 1 running)
-	"eu-west-1": &lightsail.GetInstancesOutput{
+	"eu-west-1": {
 		Instances: []*lightsail.Instance{
-			&lightsail.Instance{
+			{
 				Name: aws.String("WordPress-1"),
 				State: &lightsail.InstanceState{
 					Name: aws.String("running"),
 				},
 			},
-			&lightsail.Instance{
+			{
 				Name: aws.String("Magento-1"),
 				State: &lightsail.InstanceState{
 					Name: aws.String("stopped"),
