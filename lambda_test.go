@@ -25,24 +25,24 @@ import (
 var lambdaFnsPerRegion = map[string][]*lambda.ListFunctionsOutput{
 	// US-EAST-1 illustrates a case where ListFunctionsPages returns 1
 	// page of 4 results
-	"us-east-1": []*lambda.ListFunctionsOutput{
+	"us-east-1": {
 		&lambda.ListFunctionsOutput{
 			Functions: []*lambda.FunctionConfiguration{
-				&lambda.FunctionConfiguration{},
-				&lambda.FunctionConfiguration{},
-				&lambda.FunctionConfiguration{},
-				&lambda.FunctionConfiguration{},
+				{},
+				{},
+				{},
+				{},
 			},
 		},
 	},
 	// US-EAST-2 illustrates a case where ListFunctionsPages returns 1 page of
 	// 3 results
-	"us-east-2": []*lambda.ListFunctionsOutput{
+	"us-east-2": {
 		&lambda.ListFunctionsOutput{
 			Functions: []*lambda.FunctionConfiguration{
-				&lambda.FunctionConfiguration{},
-				&lambda.FunctionConfiguration{},
-				&lambda.FunctionConfiguration{},
+				{},
+				{},
+				{},
 			},
 		},
 	},
@@ -50,23 +50,23 @@ var lambdaFnsPerRegion = map[string][]*lambda.ListFunctionsOutput{
 	// of results.
 	// First page: 9 functions
 	// Second page: 1 functions
-	"af-south-1": []*lambda.ListFunctionsOutput{
+	"af-south-1": {
 		&lambda.ListFunctionsOutput{
 			Functions: []*lambda.FunctionConfiguration{
-				&lambda.FunctionConfiguration{},
-				&lambda.FunctionConfiguration{},
-				&lambda.FunctionConfiguration{},
-				&lambda.FunctionConfiguration{},
-				&lambda.FunctionConfiguration{},
-				&lambda.FunctionConfiguration{},
-				&lambda.FunctionConfiguration{},
-				&lambda.FunctionConfiguration{},
-				&lambda.FunctionConfiguration{},
+				{},
+				{},
+				{},
+				{},
+				{},
+				{},
+				{},
+				{},
+				{},
 			},
 		},
 		&lambda.ListFunctionsOutput{
 			Functions: []*lambda.FunctionConfiguration{
-				&lambda.FunctionConfiguration{},
+				{},
 			},
 		},
 	},

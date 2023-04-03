@@ -24,7 +24,7 @@ import (
 var ebsVolumesPerRegion = map[string][]*ec2.DescribeVolumesOutput{
 	// US-EAST-1 illustrates a case where DescribeVolumesPages returns 1 page
 	// of results: 3 volumes, but only 2 are attached.
-	"us-east-1": []*ec2.DescribeVolumesOutput{
+	"us-east-1": {
 		&ec2.DescribeVolumesOutput{
 			Volumes: []*ec2.Volume{
 				{
@@ -50,7 +50,7 @@ var ebsVolumesPerRegion = map[string][]*ec2.DescribeVolumesOutput{
 
 	// US-EAST-2 has 1 page of data: 7 Volumes in 3 reservations (1 spot
 	// and 1 scheduled instance mixed in).
-	"us-east-2": []*ec2.DescribeVolumesOutput{
+	"us-east-2": {
 		&ec2.DescribeVolumesOutput{
 			Volumes: []*ec2.Volume{},
 		},
@@ -60,7 +60,7 @@ var ebsVolumesPerRegion = map[string][]*ec2.DescribeVolumesOutput{
 	// simulate the case when DescribeVolumesPages returns three pages of
 	// results. First page has 3 (all attached), second page has 3 (2 attached)
 	// and the third page has 1 (attached).
-	"af-south-1": []*ec2.DescribeVolumesOutput{
+	"af-south-1": {
 		&ec2.DescribeVolumesOutput{
 			Volumes: []*ec2.Volume{
 				{

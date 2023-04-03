@@ -28,15 +28,15 @@ import (
 // This is our list of accessible regions for the purpose of unit testing.
 var ec2Regions *ec2.DescribeRegionsOutput = &ec2.DescribeRegionsOutput{
 	Regions: []*ec2.Region{
-		&ec2.Region{
+		{
 			OptInStatus: aws.String("opt-in-not-required"),
 			RegionName:  aws.String("us-east-1"),
 		},
-		&ec2.Region{
+		{
 			OptInStatus: aws.String("opt-in-not-required"),
 			RegionName:  aws.String("us-east-2"),
 		},
-		&ec2.Region{
+		{
 			OptInStatus: aws.String("opted-in"),
 			RegionName:  aws.String("af-south-1"),
 		},
@@ -52,26 +52,26 @@ var ec2InstancesPerRegion = map[string][]*ec2.DescribeInstancesOutput{
 	// US-EAST-1 illustrates a case where DescribeInstancesPages returns two pages of results.
 	// First page: 2 different reservations (1 running instance, then 2 instances [1 is spot])
 	// Second page: 1 reservation (2 instances, 1 of which is stopped)
-	"us-east-1": []*ec2.DescribeInstancesOutput{
+	"us-east-1": {
 		&ec2.DescribeInstancesOutput{
 			Reservations: []*ec2.Reservation{
-				&ec2.Reservation{
+				{
 					Instances: []*ec2.Instance{
-						&ec2.Instance{
+						{
 							State: &ec2.InstanceState{
 								Name: aws.String("running"),
 							},
 						},
 					},
 				},
-				&ec2.Reservation{
+				{
 					Instances: []*ec2.Instance{
-						&ec2.Instance{
+						{
 							State: &ec2.InstanceState{
 								Name: aws.String("running"),
 							},
 						},
-						&ec2.Instance{
+						{
 							InstanceLifecycle: aws.String("spot"),
 							State: &ec2.InstanceState{
 								Name: aws.String("running"),
@@ -83,14 +83,14 @@ var ec2InstancesPerRegion = map[string][]*ec2.DescribeInstancesOutput{
 		},
 		&ec2.DescribeInstancesOutput{
 			Reservations: []*ec2.Reservation{
-				&ec2.Reservation{
+				{
 					Instances: []*ec2.Instance{
-						&ec2.Instance{
+						{
 							State: &ec2.InstanceState{
 								Name: aws.String("stopped"),
 							},
 						},
-						&ec2.Instance{
+						{
 							State: &ec2.InstanceState{
 								Name: aws.String("running"),
 							},
@@ -102,59 +102,59 @@ var ec2InstancesPerRegion = map[string][]*ec2.DescribeInstancesOutput{
 	},
 	// US-EAST-2 has 1 page of data: 7 instances in 3 reservations (1 spot
 	// and 1 scheduled instance mixed in).
-	"us-east-2": []*ec2.DescribeInstancesOutput{
+	"us-east-2": {
 		&ec2.DescribeInstancesOutput{
 			Reservations: []*ec2.Reservation{
-				&ec2.Reservation{
+				{
 					Instances: []*ec2.Instance{
-						&ec2.Instance{
+						{
 							State: &ec2.InstanceState{
 								Name: aws.String("stopped"),
 							},
 						},
-						&ec2.Instance{
+						{
 							InstanceLifecycle: aws.String("scheduled"),
 						},
-						&ec2.Instance{
+						{
 							State: &ec2.InstanceState{
 								Name: aws.String("running"),
 							},
 						},
 					},
 				},
-				&ec2.Reservation{
+				{
 					Instances: []*ec2.Instance{
-						&ec2.Instance{
+						{
 							State: &ec2.InstanceState{
 								Name: aws.String("running"),
 							},
 						},
-						&ec2.Instance{
+						{
 							State: &ec2.InstanceState{
 								Name: aws.String("running"),
 							},
 						},
-						&ec2.Instance{
+						{
 							State: &ec2.InstanceState{
 								Name: aws.String("stopped"),
 							},
 						},
 					},
 				},
-				&ec2.Reservation{
+				{
 					Instances: []*ec2.Instance{
-						&ec2.Instance{
+						{
 							State: &ec2.InstanceState{
 								Name: aws.String("running"),
 							},
 						},
-						&ec2.Instance{
+						{
 							InstanceLifecycle: aws.String("spot"),
 							State: &ec2.InstanceState{
 								Name: aws.String("stopped"),
 							},
 						},
-						&ec2.Instance{
+						{
 							State: &ec2.InstanceState{
 								Name: aws.String("running"),
 							},
@@ -166,7 +166,7 @@ var ec2InstancesPerRegion = map[string][]*ec2.DescribeInstancesOutput{
 	},
 	// AF-SOUTH-1 is an "opted in" region (Cape Town, Africa). We are going to
 	// simply indicate that no instances exist here.
-	"af-south-1": []*ec2.DescribeInstancesOutput{
+	"af-south-1": {
 		&ec2.DescribeInstancesOutput{},
 	},
 }
@@ -263,7 +263,6 @@ func resolvePathByReflection(reflectStruct reflect.Value, fieldPath []string) (s
 			} else {
 				return "", false
 			}
-			break
 		}
 	}
 

@@ -38,48 +38,40 @@ var taskDefinitionsPerRegion = map[string]*TaskInfo{
 	// definition uses one container, with a single image. The third task has a single container
 	// but uses the same image as the first task. In total, there are 3 task definitions, 4
 	// containers, but with only 3 unique container images.
-	"us-east-1": &TaskInfo{
+	"us-east-1": {
 		ListOutputs: []*ecs.ListTaskDefinitionsOutput{
-			&ecs.ListTaskDefinitionsOutput{
+			{
 				TaskDefinitionArns: []*string{
 					aws.String("some-long-name:task-definition/family:1"),
 					aws.String("some-long-name:task-definition/family:2"),
 				},
 			},
-			&ecs.ListTaskDefinitionsOutput{
+			{
 				TaskDefinitionArns: []*string{
 					aws.String("some-long-name:task-definition/otherfamily:1"),
 				},
 			},
 		},
 		DescribeOutputMap: map[string]*ecs.DescribeTaskDefinitionOutput{
-			"some-long-name:task-definition/family:1": &ecs.DescribeTaskDefinitionOutput{
+			"some-long-name:task-definition/family:1": {
 				TaskDefinition: &ecs.TaskDefinition{
 					ContainerDefinitions: []*ecs.ContainerDefinition{
-						&ecs.ContainerDefinition{
-							Image: aws.String("image1"),
-						},
-						&ecs.ContainerDefinition{
-							Image: aws.String("image2"),
-						},
+						{Image: aws.String("image1")},
+						{Image: aws.String("image2")},
 					},
 				},
 			},
-			"some-long-name:task-definition/family:2": &ecs.DescribeTaskDefinitionOutput{
+			"some-long-name:task-definition/family:2": {
 				TaskDefinition: &ecs.TaskDefinition{
 					ContainerDefinitions: []*ecs.ContainerDefinition{
-						&ecs.ContainerDefinition{
-							Image: aws.String("image3"),
-						},
+						{Image: aws.String("image3")},
 					},
 				},
 			},
-			"some-long-name:task-definition/otherfamily:1": &ecs.DescribeTaskDefinitionOutput{
+			"some-long-name:task-definition/otherfamily:1": {
 				TaskDefinition: &ecs.TaskDefinition{
 					ContainerDefinitions: []*ecs.ContainerDefinition{
-						&ecs.ContainerDefinition{
-							Image: aws.String("image1"),
-						},
+						{Image: aws.String("image1")},
 					},
 				},
 			},
@@ -89,9 +81,9 @@ var taskDefinitionsPerRegion = map[string]*TaskInfo{
 	// to the caller. There are two task definitions. Each has a single container image, which
 	// are different. In total, there are 2 task definitions, 2 cotnainers and 2 unique container
 	// images.
-	"us-east-2": &TaskInfo{
+	"us-east-2": {
 		ListOutputs: []*ecs.ListTaskDefinitionsOutput{
-			&ecs.ListTaskDefinitionsOutput{
+			{
 				TaskDefinitionArns: []*string{
 					aws.String("some-long-name:task-definition/family:1"),
 					aws.String("some-long-name:task-definition/anotherfamily:1"),
@@ -99,19 +91,19 @@ var taskDefinitionsPerRegion = map[string]*TaskInfo{
 			},
 		},
 		DescribeOutputMap: map[string]*ecs.DescribeTaskDefinitionOutput{
-			"some-long-name:task-definition/family:1": &ecs.DescribeTaskDefinitionOutput{
+			"some-long-name:task-definition/family:1": {
 				TaskDefinition: &ecs.TaskDefinition{
 					ContainerDefinitions: []*ecs.ContainerDefinition{
-						&ecs.ContainerDefinition{
+						{
 							Image: aws.String("image2"),
 						},
 					},
 				},
 			},
-			"some-long-name:task-definition/anotherfamily:1": &ecs.DescribeTaskDefinitionOutput{
+			"some-long-name:task-definition/anotherfamily:1": {
 				TaskDefinition: &ecs.TaskDefinition{
 					ContainerDefinitions: []*ecs.ContainerDefinition{
-						&ecs.ContainerDefinition{
+						{
 							Image: aws.String("image4"),
 						},
 					},
@@ -120,17 +112,17 @@ var taskDefinitionsPerRegion = map[string]*TaskInfo{
 		},
 	},
 	// AF-SOUTH-1 indicates that no tasks were defined for this regino.
-	"af-south-1": &TaskInfo{
+	"af-south-1": {
 		ListOutputs: []*ecs.ListTaskDefinitionsOutput{
-			&ecs.ListTaskDefinitionsOutput{},
+			{},
 		},
 	},
 	// AF-SOUTH-2 simulates a flawed case--what would happen if DescribeTaskDefinition
 	// ever returned a failure? We simulate that by indicating that there is a Task Definition
 	// ARN for which there is no description.
-	"af-south-2": &TaskInfo{
+	"af-south-2": {
 		ListOutputs: []*ecs.ListTaskDefinitionsOutput{
-			&ecs.ListTaskDefinitionsOutput{
+			{
 				TaskDefinitionArns: []*string{
 					aws.String("this-is-a-non-existent-task-arn-which-triggers-failure"),
 				},
