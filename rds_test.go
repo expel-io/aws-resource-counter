@@ -13,6 +13,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/eks"
 
 	"github.com/aws/aws-sdk-go/service/rds"
 	"github.com/aws/aws-sdk-go/service/rds/rdsiface"
@@ -202,6 +203,16 @@ func (fsf fakeRDSServiceFactory) GetContainerService(string) *ContainerService {
 
 // Don't need to implement
 func (fsf fakeRDSServiceFactory) GetLightsailService(string) *LightsailService {
+	return nil
+}
+
+// Don't need to implement
+func (fsf fakeRDSServiceFactory) GetEKSService(regionName string) *EKSService {
+	return nil
+}
+
+// Don't need to implement
+func (fsf fakeRDSServiceFactory) GetK8Service(cluster *eks.Cluster) *K8Service {
 	return nil
 }
 

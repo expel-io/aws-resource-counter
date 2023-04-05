@@ -8,6 +8,8 @@ Summary: ServiceFactory, abstract services and the AWS Service Factory implement
 package main
 
 import (
+	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 
@@ -18,6 +20,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/ecs/ecsiface"
+	"github.com/aws/aws-sdk-go/service/eks"
+	"github.com/aws/aws-sdk-go/service/eks/eksiface"
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"github.com/aws/aws-sdk-go/service/lambda/lambdaiface"
 	"github.com/aws/aws-sdk-go/service/lightsail"
@@ -28,6 +32,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/aws/aws-sdk-go/service/sts/stsiface"
+	k8V1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/aws-iam-authenticator/pkg/token"
 )
 
 // DefaultRegion is used if the caller does not supply a region
@@ -168,6 +177,36 @@ func (lss *LightsailService) InspectInstances(input *lightsail.GetInstancesInput
 	return lss.Client.GetInstances(input)
 }
 
+// EKSService is a struct that knows how to get a list of all EKS clusters and
+// describes the clusters
+type EKSService struct {
+	Client eksiface.EKSAPI
+}
+
+// ListClusters takes an input filter specification and a function
+// to evaluate a ListClustersOutput struct. The supplied function
+// can determine when to stop iterating through EKS clusters.
+func (eksi *EKSService) ListClusters(input *eks.ListClustersInput,
+	fn func(*eks.ListClustersOutput, bool) bool) error {
+	return eksi.Client.ListClustersPages(input, fn)
+}
+
+// DescribeCluster returns a full description of a Cluster
+func (eksi *EKSService) DescribeCluster(input *eks.DescribeClusterInput) (*eks.DescribeClusterOutput, error) {
+	return eksi.Client.DescribeCluster(input)
+}
+
+// K8Service is a struct that knows how to get a list of all nodes
+// within a cluster
+type K8Service struct {
+	Client kubernetes.Interface
+}
+
+// Returns a list of nodes in a cluster
+func (k8s *K8Service) ListNodes() (*k8V1.NodeList, error) {
+	return k8s.Client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+}
+
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Abstract Service Factory (provides access to all Abstract Services)
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -178,6 +217,8 @@ type ServiceFactory interface {
 	GetCurrentRegion() string
 	GetAccountIDService() *AccountIDService
 	GetEC2InstanceService(string) *EC2InstanceService
+	GetEKSService(string) *EKSService
+	GetK8Service(*eks.Cluster) *K8Service
 	GetRDSInstanceService(string) *RDSInstanceService
 	GetS3Service() *S3Service
 	GetLambdaService(string) *LambdaService
@@ -360,5 +401,61 @@ func (awssf *AWSServiceFactory) GetLightsailService(regionName string) *Lightsai
 
 	return &LightsailService{
 		Client: client,
+	}
+}
+
+// GetEKSService returns an instance of an EKSService associated
+// with our session. The caller can supply an optional region name to contruct
+// an instance associated with that region.
+func (awssf *AWSServiceFactory) GetEKSService(regionName string) *EKSService {
+	// Construct our service client
+	var client eksiface.EKSAPI
+	if regionName == "" {
+		client = eks.New(awssf.Session)
+	} else {
+		client = eks.New(awssf.Session, aws.NewConfig().WithRegion(regionName))
+	}
+
+	return &EKSService{
+		Client: client,
+	}
+}
+
+// Create a K8 client
+// Reused code: https://stackoverflow.com/questions/60547409/unable-to-obtain-kubeconfig-of-an-aws-eks-cluster-in-go-code
+func (awssf *AWSServiceFactory) GetK8Service(cluster *eks.Cluster) *K8Service {
+	gen, err := token.NewGenerator(true, false)
+	if err != nil {
+		return nil
+	}
+
+	tok, err := gen.GetWithOptions(&token.GetTokenOptions{
+		ClusterID: aws.StringValue(cluster.Name),
+		Session:   awssf.Session,
+	})
+	if err != nil {
+		return nil
+	}
+
+	ca, err := base64.StdEncoding.DecodeString(aws.StringValue(cluster.CertificateAuthority.Data))
+	if err != nil {
+		return nil
+	}
+
+	clientset, err := kubernetes.NewForConfig(
+		&rest.Config{
+			Host:        aws.StringValue(cluster.Endpoint),
+			BearerToken: tok.Token,
+			TLSClientConfig: rest.TLSClientConfig{
+				CAData: ca,
+			},
+		},
+	)
+	if err != nil {
+		return nil
+	}
+
+	return &K8Service{
+		Client: clientset,
 	}
 }

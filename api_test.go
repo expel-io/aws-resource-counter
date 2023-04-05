@@ -1,14 +1,23 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/base64"
+	"encoding/pem"
 	"io"
+	"math/big"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/aws/aws-sdk-go/service/eks"
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"github.com/aws/aws-sdk-go/service/lightsail"
 	"github.com/aws/aws-sdk-go/service/rds"
@@ -385,4 +394,128 @@ func TestAwsServiceFactoryGetLightsailService(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestAwsServiceFactoryGetEKSService(t *testing.T) {
+	// Create our test cases
+	cases := []struct {
+		RegionName string
+	}{
+		{},
+		{
+			RegionName: "us-west-1",
+		},
+	}
+
+	// Loop through the test cases
+	for _, c := range cases {
+		// Create a config for the region?
+		var config = &aws.Config{}
+		if c.RegionName != "" {
+			config = config.WithRegion(c.RegionName)
+		}
+
+		// Create our test
+		session, err := session.NewSession(config)
+		if err != nil {
+			t.Errorf("Unexpected error while creating a new session: %v", err)
+		}
+
+		// Create an AWS Service Factory
+		sf := &AWSServiceFactory{
+			Session: session,
+		}
+
+		// Get the desired service
+		service := sf.GetEKSService(c.RegionName)
+
+		// Is the service nil?
+		if service == nil {
+			t.Errorf("No service returned for %s", "GetLightsailService")
+		} else if service.Client != nil {
+			// Convert to implementation type
+			implType, ok := service.Client.(*eks.EKS)
+			if !ok {
+				t.Errorf("Unexpected Client type: expected %v, actual %v", "*eks.EKS", implType)
+			} else if *implType.Config.Region != c.RegionName {
+				t.Errorf("Unexpected value for Client.Config.Region: expected %s, actual %s", c.RegionName, *implType.Config.Region)
+			}
+		}
+	}
+}
+
+func TestAwsServiceFactoryGetK8Service(t *testing.T) {
+	// Create our test cases
+	testString := "test-cluster"
+	testCA, err := createFakeCaCert()
+	if err != nil {
+		t.Errorf("Unable to create fake CA cert: %v", err)
+	}
+	testBase64 := base64.StdEncoding.EncodeToString([]byte(testCA))
+
+	cluster := &eks.Cluster{
+		Name:                 &testString,
+		CertificateAuthority: &eks.Certificate{Data: &testBase64},
+		Endpoint:             &testString,
+	}
+
+	// Create a config for the region?
+	var config = &aws.Config{}
+	config = config.WithRegion("")
+
+	// Create our test
+	session, err := session.NewSession(config)
+	if err != nil {
+		t.Errorf("Unexpected error while creating a new session: %v", err)
+	}
+
+	// Create an AWS Service Factory
+	sf := &AWSServiceFactory{
+		Session: session,
+	}
+
+	// Get the desired service
+	service := sf.GetK8Service(cluster)
+
+	// Is the service nil?
+	if service == nil {
+		t.Errorf("No service returned for %s", "GetK8Service")
+	}
+
+}
+
+func createFakeCaCert() ([]byte, error) {
+
+	ca := &x509.Certificate{
+		SerialNumber: big.NewInt(2019),
+		Subject: pkix.Name{
+			Organization:  []string{"Company, INC."},
+			Country:       []string{"US"},
+			Province:      []string{""},
+			Locality:      []string{"San Francisco"},
+			StreetAddress: []string{"Golden Gate Bridge"},
+			PostalCode:    []string{"94016"},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().AddDate(10, 0, 0),
+		IsCA:                  true,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
+	}
+
+	caPrivKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return nil, err
+	}
+
+	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, &caPrivKey.PublicKey, caPrivKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: caBytes,
+	}), nil
 }

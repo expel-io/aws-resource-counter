@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/ecs/ecsiface"
+	"github.com/aws/aws-sdk-go/service/eks"
 	"github.com/expel-io/aws-resource-counter/mock"
 )
 
@@ -265,6 +266,16 @@ func (fsf fakeCntrServiceFactory) GetContainerService(regionName string) *Contai
 
 // Don't need to implement
 func (fsf fakeCntrServiceFactory) GetLightsailService(string) *LightsailService {
+	return nil
+}
+
+// Don't need to implement
+func (fsf fakeCntrServiceFactory) GetEKSService(regionName string) *EKSService {
+	return nil
+}
+
+// Don't need to implement
+func (fsf fakeCntrServiceFactory) GetK8Service(cluster *eks.Cluster) *K8Service {
 	return nil
 }
 

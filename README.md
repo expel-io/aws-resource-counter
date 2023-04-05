@@ -117,6 +117,7 @@ Activity
  * Retrieving RDS instance counts...................OK (7)
  * Retrieving Lightsail instance counts................OK (0)
  * Retrieving S3 bucket counts...OK (13)
+ * Retrieving EKS Node counts....................OK (2)
  * Writing to file...OK
 
 Success.
@@ -221,12 +222,59 @@ To use this utility, this minimal IAM Profile can be associated with a bare user
                 "lightsail:GetInstances",
                 "lightsail:GetRegions",
                 "rds:DescribeDBInstances",
-                "s3:ListAllMyBuckets"
+                "s3:ListAllMyBuckets",
+                "eks:AccessKubernetesApi",
+                "eks:DescribeCluster",
+                "eks:ListClusters",
             ],
             "Resource": "*"
         }
     ]
 }
+```
+
+## For EKS Nodes
+
+In order to get counts of nodes within an EKS cluster, you must create a kubernetes cluster role and apply it to an aws user. See [View Kubernetes resource permissions](https://docs.aws.amazon.com/eks/latest/userguide/view-kubernetes-resources.html#view-kubernetes-resources-permissions) for further details.
+
+1. Create this ClusterRole and ClusterRoleBindings file `expel-node-resource-counter.yaml`:
+```
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+   name: expel-node-resource-counter-clusterrole
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: expel-node-resource-counter
+subjects:
+- kind: User
+  name: expel-node-resource-counter-user
+roleRef:
+  kind: ClusterRole
+  name: expel-node-resource-counter-clusterrole
+  apiGroup: rbac.authorization.k8s.io
+```
+2. Create the ClusterRole:
+```
+kubectl apply -f expel-node-resource-counter.yaml
+```
+3. Add the mapping to an aws user:
+```
+eksctl create iamidentitymapping \
+   --cluster <your-cluster-name> \
+   --region <your-region> \
+   --arn <your-expel-user-arn> \
+   --username expel-node-resource-counter-user
 ```
 
 ## Resources Counted
