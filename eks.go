@@ -28,20 +28,13 @@ func EKSNodes(sf ServiceFactory, am ActivityMonitor, allRegions bool) int {
 	// Indicate activity
 	am.StartAction("Retrieving EKS Node counts")
 
-	// Create a new instance of the EKS service
+	regionsSlice := []string{""}
 	if allRegions {
-		// Get the list of all enabled regions for this account
-		regionsSlice := GetEC2Regions(sf.GetEC2InstanceService(""), am)
+		regionsSlice = GetEC2Regions(sf.GetEC2InstanceService(""), am)
+	}
 
-		// Loop through all of the regions
-		for _, regionName := range regionsSlice {
-			count, eksErrs := eksCountForSingleRegion(regionName, sf, am)
-			errs = append(errs, eksErrs...)
-			nodeCount += count
-		}
-	} else {
-		// Get the EC2 counts for the region selected by this session
-		count, eksErrs := eksCountForSingleRegion("", sf, am)
+	for _, regionName := range regionsSlice {
+		count, eksErrs := eksCountForSingleRegion(regionName, sf, am)
 		errs = append(errs, eksErrs...)
 		nodeCount += count
 	}
