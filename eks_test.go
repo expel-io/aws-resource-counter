@@ -92,11 +92,8 @@ func (feks *fakeEKService) ListClustersPages(input *eks.ListClustersInput,
 		// Are we looking at the last "page" of our output?
 		lastPage := index == len(feks.LCResponse)-1
 
-		// Invoke our fn
-		cont := fn(output, lastPage)
-
 		// Shall we exit our loop?
-		if !cont {
+		if cont := fn(output, lastPage); !cont {
 			break
 		}
 	}

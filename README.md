@@ -225,7 +225,7 @@ To use this utility, this minimal IAM Profile can be associated with a bare user
                 "s3:ListAllMyBuckets",
                 "eks:AccessKubernetesApi",
                 "eks:DescribeCluster",
-                "eks:ListClusters",
+                "eks:ListClusters"
             ],
             "Resource": "*"
         }

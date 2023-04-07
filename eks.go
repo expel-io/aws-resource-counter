@@ -8,6 +8,7 @@ Summary: Provides a count of all EKS nodes.
 package main
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -22,23 +23,21 @@ import (
 func EKSNodes(sf ServiceFactory, am ActivityMonitor, allRegions bool) int {
 	nodeCount := 0
 
-	errs := make([]string, 0)
+	errs := make([]error, 0)
 
 	// Indicate activity
 	am.StartAction("Retrieving EKS Node counts")
 
 	// Create a new instance of the EKS service
+	regionsSlice := []string{""}
 	if allRegions {
-		// Get the list of all enabled regions for this account
-		regionsSlice := GetEC2Regions(sf.GetEC2InstanceService(""), am)
+		regionsSlice = GetEC2Regions(sf.GetEC2InstanceService(""), am)
+	}
 
-		// Loop through all of the regions
-		for _, regionName := range regionsSlice {
-			nodeCount += eksCountForSingleRegion(regionName, sf, am, &errs)
-		}
-	} else {
-		// Get the EC2 counts for the region selected by this session
-		nodeCount += eksCountForSingleRegion("", sf, am, &errs)
+	for _, regionName := range regionsSlice {
+		count, eksErrs := eksCountForSingleRegion(regionName, sf, am)
+		errs = append(errs, eksErrs...)
+		nodeCount += count
 	}
 
 	// Indicate end of activity
@@ -46,13 +45,15 @@ func EKSNodes(sf ServiceFactory, am ActivityMonitor, allRegions bool) int {
 
 	// Print list of errors that happened while retrieving node counts
 	for _, err := range errs {
-		am.SubResourceError(err)
+		am.SubResourceError(err.Error())
 	}
 
 	return nodeCount
 }
 
-func eksCountForSingleRegion(region string, sf ServiceFactory, am ActivityMonitor, errs *[]string) int {
+func eksCountForSingleRegion(region string, sf ServiceFactory, am ActivityMonitor) (int, []error) {
+	errs := make([]error, 0)
+
 	// Indicate activity
 	am.Message(".")
 
@@ -63,7 +64,7 @@ func eksCountForSingleRegion(region string, sf ServiceFactory, am ActivityMonito
 	input := &eks.ListClustersInput{}
 
 	nodeCount := 0
-	err := eksSvc.ListClusters(input, func(clusterList *eks.ListClustersOutput, lastPage bool) bool {
+	err := eksSvc.ListClusters(input, func(clusterList *eks.ListClustersOutput, _ bool) bool {
 		// Loop through each cluster list
 		for _, cluster := range clusterList.Clusters {
 			// Retrieve cluster info
@@ -73,7 +74,7 @@ func eksCountForSingleRegion(region string, sf ServiceFactory, am ActivityMonito
 
 			// If an error is found, add error message to slice and move onto the next cluster
 			if err != nil {
-				*errs = append(*errs, fmt.Sprintf("Unable to retrieve cluster information for %s (%s)", *cluster, err))
+				errs = append(errs, fmt.Errorf("unable to retrieve cluster information for %s (%s)", *cluster, err))
 				return true
 			}
 
@@ -85,22 +86,22 @@ func eksCountForSingleRegion(region string, sf ServiceFactory, am ActivityMonito
 
 				// If an error is found, add error message to slice and move onto the next cluster
 				if err != nil {
-					*errs = append(*errs, fmt.Sprintf("Unable to retrieve nodes in cluster \"%s\" (%s)", *cluster, err))
+					errs = append(errs, fmt.Errorf("unable to retrieve nodes in cluster \"%s\" (%s)", *cluster, err))
 					return true
 				}
 
 				nodeCount += len(nodes.Items)
-			} else {
-				*errs = append(*errs, "Unable to create a Kubernetes client")
+				continue
 			}
+			errs = append(errs, errors.New("unable to create a Kubernetes client"))
 		}
 
 		return true
 	})
 
 	if err != nil {
-		*errs = append(*errs, fmt.Sprintf("Unable to list clusters for region %s (%s)", region, err))
+		errs = append(errs, fmt.Errorf("unable to list clusters for region %s (%s)", region, err))
 	}
 
-	return nodeCount
+	return nodeCount, errs
 }
