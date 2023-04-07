@@ -439,6 +439,7 @@ func (awssf *AWSServiceFactory) GetK8Service(cluster *eks.Cluster) *K8Service {
 		},
 	)
 	if err != nil {
+		fmt.Println(err)
 		return nil
 	}
 
