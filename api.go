@@ -424,20 +424,7 @@ func (awssf *AWSServiceFactory) GetEKSService(regionName string) *EKSService {
 // Create a K8 client
 // Reused code: https://stackoverflow.com/questions/60547409/unable-to-obtain-kubeconfig-of-an-aws-eks-cluster-in-go-code
 func (awssf *AWSServiceFactory) GetK8Service(cluster *eks.Cluster) *K8Service {
-	gen, err := token.NewGenerator(true, false)
-	if err != nil {
-		return nil
-	}
-
-	tok, err := gen.GetWithOptions(&token.GetTokenOptions{
-		ClusterID: aws.StringValue(cluster.Name),
-		Session:   awssf.Session,
-	})
-	if err != nil {
-		return nil
-	}
-
-	ca, err := base64.StdEncoding.DecodeString(aws.StringValue(cluster.CertificateAuthority.Data))
+	tok, ca, err := getTokenAndCACert(cluster, awssf.Session)
 	if err != nil {
 		return nil
 	}
@@ -458,4 +445,26 @@ func (awssf *AWSServiceFactory) GetK8Service(cluster *eks.Cluster) *K8Service {
 	return &K8Service{
 		Client: clientset,
 	}
+}
+
+func getTokenAndCACert(cluster *eks.Cluster, session *session.Session) (token.Token, []byte, error) {
+	gen, err := token.NewGenerator(true, false)
+	if err != nil {
+		return token.Token{}, nil, err
+	}
+
+	tok, err := gen.GetWithOptions(&token.GetTokenOptions{
+		ClusterID: aws.StringValue(cluster.Name),
+		Session:   session,
+	})
+	if err != nil {
+		return token.Token{}, nil, err
+	}
+
+	ca, err := base64.StdEncoding.DecodeString(aws.StringValue(cluster.CertificateAuthority.Data))
+	if err != nil {
+		return token.Token{}, nil, err
+	}
+
+	return tok, ca, nil
 }
