@@ -218,7 +218,7 @@ type ServiceFactory interface {
 	GetAccountIDService() *AccountIDService
 	GetEC2InstanceService(string) *EC2InstanceService
 	GetEKSService(string) *EKSService
-	GetK8Service(*eks.Cluster) *K8Service
+	GetK8Service(ClusterFactory, string) *K8Service
 	GetRDSInstanceService(string) *RDSInstanceService
 	GetS3Service() *S3Service
 	GetLambdaService(string) *LambdaService
@@ -421,51 +421,71 @@ func (awssf *AWSServiceFactory) GetEKSService(regionName string) *EKSService {
 	}
 }
 
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// Cluster Factory
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+type ClusterFactory interface {
+	GetToken(*session.Session) (string, error)
+	GetCACert() ([]byte, error)
+}
+
+type EKSCluster struct {
+	Cluster *eks.Cluster
+}
+
+func (c *EKSCluster) GetToken(session *session.Session) (string, error) {
+	gen, err := token.NewGenerator(true, false)
+	if err != nil {
+		return "", err
+	}
+
+	tok, err := gen.GetWithOptions(&token.GetTokenOptions{
+		ClusterID: aws.StringValue(c.Cluster.Name),
+		Session:   session,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return tok.Token, nil
+}
+
+func (c *EKSCluster) GetCACert() ([]byte, error) {
+	ca, err := base64.StdEncoding.DecodeString(aws.StringValue(c.Cluster.CertificateAuthority.Data))
+	if err != nil {
+		return nil, err
+	}
+
+	return ca, nil
+}
+
 // Create a K8 client
 // Reused code: https://stackoverflow.com/questions/60547409/unable-to-obtain-kubeconfig-of-an-aws-eks-cluster-in-go-code
-func (awssf *AWSServiceFactory) GetK8Service(cluster *eks.Cluster) *K8Service {
-	tok, ca, err := getTokenAndCACert(cluster, awssf.Session)
+func (awssf *AWSServiceFactory) GetK8Service(cf ClusterFactory, clusterEndpoint string) *K8Service {
+	token, err := cf.GetToken(awssf.Session)
+	if err != nil {
+		return nil
+	}
+
+	ca, err := cf.GetCACert()
 	if err != nil {
 		return nil
 	}
 
 	clientset, err := kubernetes.NewForConfig(
 		&rest.Config{
-			Host:        aws.StringValue(cluster.Endpoint),
-			BearerToken: tok.Token,
+			Host:        aws.StringValue(&clusterEndpoint),
+			BearerToken: token,
 			TLSClientConfig: rest.TLSClientConfig{
 				CAData: ca,
 			},
 		},
 	)
 	if err != nil {
-		fmt.Println(err)
 		return nil
 	}
 
 	return &K8Service{
 		Client: clientset,
 	}
-}
-
-func getTokenAndCACert(cluster *eks.Cluster, session *session.Session) (token.Token, []byte, error) {
-	gen, err := token.NewGenerator(true, false)
-	if err != nil {
-		return token.Token{}, nil, err
-	}
-
-	tok, err := gen.GetWithOptions(&token.GetTokenOptions{
-		ClusterID: aws.StringValue(cluster.Name),
-		Session:   session,
-	})
-	if err != nil {
-		return token.Token{}, nil, err
-	}
-
-	ca, err := base64.StdEncoding.DecodeString(aws.StringValue(cluster.CertificateAuthority.Data))
-	if err != nil {
-		return token.Token{}, nil, err
-	}
-
-	return tok, ca, nil
 }

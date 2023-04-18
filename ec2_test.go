@@ -16,7 +16,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
-	"github.com/aws/aws-sdk-go/service/eks"
 
 	"github.com/expel-io/aws-resource-counter/mock"
 )
@@ -443,7 +442,7 @@ func (fsf fakeEC2ServiceFactory) GetEKSService(regionName string) *EKSService {
 }
 
 // Don't need to implement
-func (fsf fakeEC2ServiceFactory) GetK8Service(cluster *eks.Cluster) *K8Service {
+func (fsf fakeEC2ServiceFactory) GetK8Service(cf ClusterFactory, clusterEndpoint string) *K8Service {
 	return nil
 }
 

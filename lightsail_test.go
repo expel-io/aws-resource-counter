@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/eks"
 	"github.com/aws/aws-sdk-go/service/lightsail"
 	"github.com/aws/aws-sdk-go/service/lightsail/lightsailiface"
 	"github.com/expel-io/aws-resource-counter/mock"
@@ -188,7 +187,7 @@ func (fsf fakeLightsailServiceFactory) GetEKSService(regionName string) *EKSServ
 }
 
 // Don't need to implement
-func (fsf fakeLightsailServiceFactory) GetK8Service(cluster *eks.Cluster) *K8Service {
+func (fsf fakeLightsailServiceFactory) GetK8Service(cf ClusterFactory, clusterEndpoint string) *K8Service {
 	return nil
 }
 

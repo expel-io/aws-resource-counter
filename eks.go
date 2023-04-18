@@ -78,8 +78,10 @@ func eksCountForSingleRegion(region string, sf ServiceFactory, am ActivityMonito
 				return true
 			}
 
+			eksCluster := EKSCluster{Cluster: clusterInfo.Cluster}
+
 			// Create the Kubernetes API Client
-			k8Svc := sf.GetK8Service(clusterInfo.Cluster)
+			k8Svc := sf.GetK8Service(&eksCluster, *clusterInfo.Cluster.Endpoint)
 			if k8Svc != nil {
 				// Get list of nodes within the cluster
 				nodes, err := k8Svc.ListNodes()

@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/eks"
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"github.com/aws/aws-sdk-go/service/lambda/lambdaiface"
 	"github.com/expel-io/aws-resource-counter/mock"
@@ -194,7 +193,7 @@ func (fsf fakeLambdaServiceFactory) GetEKSService(regionName string) *EKSService
 }
 
 // Don't need to implement
-func (fsf fakeLambdaServiceFactory) GetK8Service(cluster *eks.Cluster) *K8Service {
+func (fsf fakeLambdaServiceFactory) GetK8Service(cf ClusterFactory, clusterEndpoint string) *K8Service {
 	return nil
 }
 

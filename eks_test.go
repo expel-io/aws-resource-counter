@@ -37,7 +37,8 @@ var fakeEKSClustersSlice = []*eks.ListClustersOutput{
 
 var fakeEKSDescribeCluster = &eks.DescribeClusterOutput{
 	Cluster: &eks.Cluster{
-		Name: aws.String("cluster"),
+		Name:     aws.String("cluster"),
+		Endpoint: aws.String("endpoint-string"),
 	},
 }
 
@@ -165,7 +166,7 @@ func (fsf fakeEKSServiceFactory) GetEKSService(regionName string) *EKSService {
 	}
 }
 
-func (fsf fakeEKSServiceFactory) GetK8Service(cluster *eks.Cluster) *K8Service {
+func (fsf fakeEKSServiceFactory) GetK8Service(cf ClusterFactory, clusterEndpoint string) *K8Service {
 	if fsf.Nodes == nil {
 		return nil
 	}
