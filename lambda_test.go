@@ -187,6 +187,11 @@ func (fsf fakeLambdaServiceFactory) GetLightsailService(string) *LightsailServic
 	return nil
 }
 
+// Don't need to implement
+func (fsf fakeLambdaServiceFactory) GetEKSService(regionName string) *EKSService {
+	return nil
+}
+
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Unit Test for LambdaFunctions
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=

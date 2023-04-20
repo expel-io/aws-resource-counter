@@ -24,6 +24,7 @@ type ActivityMonitor interface {
 	StartAction(string, ...interface{})
 	CheckError(error) bool
 	ActionError(string, ...interface{})
+	SubResourceError(string, ...interface{})
 	EndAction(string, ...interface{})
 	Exit(int)
 }
@@ -38,7 +39,7 @@ type TerminalActivityMonitor struct {
 // Message constructs a simple message from the format string and arguments
 // and sends it to the associated io.Writer.
 func (tam *TerminalActivityMonitor) Message(format string, v ...interface{}) {
-	fmt.Fprint(tam.Writer, fmt.Sprintf(format, v...))
+	fmt.Fprintf(tam.Writer, format, v...)
 }
 
 // StartAction constructs a structured message to the associated Writer
@@ -66,7 +67,6 @@ func (tam *TerminalActivityMonitor) CheckError(err error) bool {
 		case "NoCredentialProviders":
 			// TODO Can we establish this failure earlier? When the session is created?
 			tam.ActionError("Either the profile does not exist, is misspelled or credentials are not stored there.")
-			break
 		case "AccessDeniedException":
 			// Construct a message by taking the first part of the string up to a newline character
 			tam.ActionError(parts[0])
@@ -92,6 +92,13 @@ func (tam *TerminalActivityMonitor) ActionError(format string, v ...interface{})
 
 	// Exit the program
 	tam.Exit(1)
+}
+
+// SubResourceError formats the supplied format string (and associated parameters) in
+// RED.
+func (tam *TerminalActivityMonitor) SubResourceError(format string, v ...interface{}) {
+	// Display an error message (and newline)
+	fmt.Fprintln(tam.Writer, color.Red(fmt.Sprintf(fmt.Sprintf("   - [ERROR] %s", format), v...)))
 }
 
 // EndAction receives a format string (and arguments) and sends to the supplied

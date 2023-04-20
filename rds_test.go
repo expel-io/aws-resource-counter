@@ -205,6 +205,11 @@ func (fsf fakeRDSServiceFactory) GetLightsailService(string) *LightsailService {
 	return nil
 }
 
+// Don't need to implement
+func (fsf fakeRDSServiceFactory) GetEKSService(regionName string) *EKSService {
+	return nil
+}
+
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Unit Test for RDSInstances
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=

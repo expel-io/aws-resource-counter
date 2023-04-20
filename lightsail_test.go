@@ -181,6 +181,11 @@ func (fsf fakeLightsailServiceFactory) GetLightsailService(regionName string) *L
 	}
 }
 
+// Don't need to implement
+func (fsf fakeLightsailServiceFactory) GetEKSService(regionName string) *EKSService {
+	return nil
+}
+
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Unit Test for LightsailInstances
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=

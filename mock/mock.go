@@ -16,13 +16,13 @@ import (
 // errored, ended).
 //
 type ActivityMonitorImpl struct {
-	ActionStarted  bool
-	ErrorOccured   bool
-	ActionEnded    bool
-	ErrorMessage   string
+	ActionStarted bool
+	ErrorOccured  bool
+	ActionEnded   bool
+	ErrorMessage  string
 	ProgramExited bool
-	ExitCode       int
-	Messages       []string
+	ExitCode      int
+	Messages      []string
 }
 
 // Message does nothing
@@ -54,6 +54,12 @@ func (m *ActivityMonitorImpl) CheckError(err error) bool {
 
 // ActionError is what what would be called if we encounter an error.
 func (m *ActivityMonitorImpl) ActionError(format string, v ...interface{}) {
+	m.Messages = append(m.Messages, fmt.Sprintf(format, v...))
+	m.ErrorOccured = true
+}
+
+// SubResourceError is called if we encounter an error in EKS.
+func (m *ActivityMonitorImpl) SubResourceError(format string, v ...interface{}) {
 	m.Messages = append(m.Messages, fmt.Sprintf(format, v...))
 	m.ErrorOccured = true
 }

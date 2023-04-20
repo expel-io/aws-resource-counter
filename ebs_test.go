@@ -244,6 +244,11 @@ func (fsf fakeEBSServiceFactory) GetLightsailService(string) *LightsailService {
 	return nil
 }
 
+// Don't need to implement
+func (fsf fakeEBSServiceFactory) GetEKSService(regionName string) *EKSService {
+	return nil
+}
+
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Unit Test for EBSVolumes
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=

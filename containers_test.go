@@ -268,6 +268,11 @@ func (fsf fakeCntrServiceFactory) GetLightsailService(string) *LightsailService 
 	return nil
 }
 
+// Don't need to implement
+func (fsf fakeCntrServiceFactory) GetEKSService(regionName string) *EKSService {
+	return nil
+}
+
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Unit Test for UniqueContainerImages
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=

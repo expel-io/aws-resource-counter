@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/aws/aws-sdk-go/service/eks"
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"github.com/aws/aws-sdk-go/service/lightsail"
 	"github.com/aws/aws-sdk-go/service/rds"
@@ -384,5 +386,55 @@ func TestAwsServiceFactoryGetLightsailService(t *testing.T) {
 				t.Errorf("Unexpected value for Client.Config.Region: expected %s, actual %s", c.RegionName, *implType.Config.Region)
 			}
 		}
+	}
+}
+
+func TestAwsServiceFactoryGetEKSService(t *testing.T) {
+	// Create our test cases
+	cases := []struct {
+		RegionName string
+	}{
+		{},
+		{
+			RegionName: "us-west-1",
+		},
+	}
+
+	// Loop through the test cases
+	for _, c := range cases {
+		// Create a config for the region?
+		var config = &aws.Config{}
+		if c.RegionName != "" {
+			config = config.WithRegion(c.RegionName)
+		}
+
+		// Create our test
+		session, err := session.NewSession(config)
+		if err != nil {
+			t.Errorf("Unexpected error while creating a new session: %v", err)
+		}
+
+		// Create an AWS Service Factory
+		sf := &AWSServiceFactory{
+			Session: session,
+		}
+
+		t.Run(fmt.Sprintf("testing with region name: %s", c.RegionName), func(t *testing.T) {
+			// Get the desired service
+			service := sf.GetEKSService(c.RegionName)
+
+			// Is the service nil?
+			if service == nil {
+				t.Errorf("No service returned for %s", "GetLightsailService")
+			} else if service.Client != nil {
+				// Convert to implementation type
+				implType, ok := service.Client.(*eks.EKS)
+				if !ok {
+					t.Errorf("Unexpected Client type: expected %v, actual %v", "*eks.EKS", implType)
+				} else if *implType.Config.Region != c.RegionName {
+					t.Errorf("Unexpected value for Client.Config.Region: expected %s, actual %s", c.RegionName, *implType.Config.Region)
+				}
+			}
+		})
 	}
 }

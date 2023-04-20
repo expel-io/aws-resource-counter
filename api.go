@@ -18,6 +18,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/ecs/ecsiface"
+	"github.com/aws/aws-sdk-go/service/eks"
+	"github.com/aws/aws-sdk-go/service/eks/eksiface"
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"github.com/aws/aws-sdk-go/service/lambda/lambdaiface"
 	"github.com/aws/aws-sdk-go/service/lightsail"
@@ -168,6 +170,33 @@ func (lss *LightsailService) InspectInstances(input *lightsail.GetInstancesInput
 	return lss.Client.GetInstances(input)
 }
 
+// EKSService is a struct that knows how to get a list of all EKS clusters and
+// describes the clusters
+type EKSService struct {
+	Client eksiface.EKSAPI
+}
+
+// ListClusters takes an input filter specification and a function
+// to evaluate a ListClustersOutput struct. The supplied function
+// can determine when to stop iterating through EKS clusters.
+func (eksi *EKSService) ListClusters(input *eks.ListClustersInput,
+	fn func(*eks.ListClustersOutput, bool) bool) error {
+	return eksi.Client.ListClustersPages(input, fn)
+}
+
+// ListNodeGroups takes an input filter specification and a function
+// to evaluate a ListNodeGroupsOutput struct. The supplied function
+// can determine when to stop iterating through Nodegroups.
+func (eksi *EKSService) ListNodeGroups(input *eks.ListNodegroupsInput,
+	fn func(*eks.ListNodegroupsOutput, bool) bool) error {
+	return eksi.Client.ListNodegroupsPages(input, fn)
+}
+
+// DescribeNodegroups returns a full description of a Nodegroup
+func (eksi *EKSService) DescribeNodegroups(input *eks.DescribeNodegroupInput) (*eks.DescribeNodegroupOutput, error) {
+	return eksi.Client.DescribeNodegroup(input)
+}
+
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Abstract Service Factory (provides access to all Abstract Services)
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -178,6 +207,7 @@ type ServiceFactory interface {
 	GetCurrentRegion() string
 	GetAccountIDService() *AccountIDService
 	GetEC2InstanceService(string) *EC2InstanceService
+	GetEKSService(string) *EKSService
 	GetRDSInstanceService(string) *RDSInstanceService
 	GetS3Service() *S3Service
 	GetLambdaService(string) *LambdaService
@@ -359,6 +389,23 @@ func (awssf *AWSServiceFactory) GetLightsailService(regionName string) *Lightsai
 	}
 
 	return &LightsailService{
+		Client: client,
+	}
+}
+
+// GetEKSService returns an instance of an EKSService associated
+// with our session. The caller can supply an optional region name to contruct
+// an instance associated with that region.
+func (awssf *AWSServiceFactory) GetEKSService(regionName string) *EKSService {
+	// Construct our service client
+	var client eksiface.EKSAPI
+	if regionName == "" {
+		client = eks.New(awssf.Session)
+	} else {
+		client = eks.New(awssf.Session, aws.NewConfig().WithRegion(regionName))
+	}
+
+	return &EKSService{
 		Client: client,
 	}
 }

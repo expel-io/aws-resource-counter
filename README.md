@@ -117,6 +117,7 @@ Activity
  * Retrieving RDS instance counts...................OK (7)
  * Retrieving Lightsail instance counts................OK (0)
  * Retrieving S3 bucket counts...OK (13)
+ * Retrieving EKS Node counts....................OK (2)
  * Writing to file...OK
 
 Success.
@@ -127,9 +128,9 @@ As you can see above, no command line arguments were necessary: it used my defau
 Here is what the CSV file looks like. It is important to mention that this tool was run TWICE to collect the results of two different accounts/profiles.
 
 ```csv
-Account ID,Timestamp,Region,# of EC2 Instances,# of Spot Instances,# of EBS Volumes,# of Unique Containers,# of Lambda Functions,# of RDS Instances,# of Lightsail Instances,# of S3 Buckets
-896149672290,2020-10-20T16:29:39-04:00,ALL_REGIONS,2,3,7,3,2,3,2,2
-240520192079,2020-10-21T16:24:06-04:00,ALL_REGIONS,5,4,9,3,12,7,0,13
+Account ID,Timestamp,Region,# of EC2 Instances,# of Spot Instances,# of EBS Volumes,# of Unique Containers,# of Lambda Functions,# of RDS Instances,# of Lightsail Instances,# of S3 Buckets,# of EKS Nodes
+896149672290,2020-10-20T16:29:39-04:00,ALL_REGIONS,2,3,7,3,2,3,2,2,2
+240520192079,2020-10-21T16:24:06-04:00,ALL_REGIONS,5,4,9,3,12,7,0,13,0
 ```
 
 Here are some notes on specific columns:
@@ -221,7 +222,10 @@ To use this utility, this minimal IAM Profile can be associated with a bare user
                 "lightsail:GetInstances",
                 "lightsail:GetRegions",
                 "rds:DescribeDBInstances",
-                "s3:ListAllMyBuckets"
+                "s3:ListAllMyBuckets",
+                "eks:DescribeNodegroup",
+                "eks:ListNodegroups",
+                "eks:ListClusters"
             ],
             "Resource": "*"
         }
@@ -277,6 +281,11 @@ The `aws-resource-counter` examines the following resources:
    * We do not qualify the type of S3 bucket.
    * *NOTE:* We cannot currently count S3 buckets on a per-region basis (due to limitations with the AWS SDK).
    * This is stored in the generated CSV file under the "# of S3 Buckets" column.
+
+1. **EKS Nodes.** We count the number of nodes across all clusters in all regions.
+
+   * We do not qualify the type of EKS node.
+   * This is stored in the generated CSV file under the "# of EKS Nodes" column.
 
 ## Alternative Means of Resource Counting
 
@@ -568,3 +577,29 @@ $ aws s3api list-buckets $aws_p --query 'length(Buckets)'
 ```
 
 Note that it is not possible through the AWS CLI to get S3 buckets on a per-region basis.
+
+
+### EKS Nodes
+
+To get a list of EKS nodes in a given region, we use the AWS CLI `eks` command, as in:
+
+```bash
+$ region=us-east-2
+$ clusters=$(aws eks list-clusters $aws_p --no-paginate --region $region --output text --query='clusters')
+$ for cluster in $clusters; do \
+   for node_pool in $(aws eks list-nodegroups $aws_p --no-paginate --region $region --cluster-name $cluster --query=nodegroups --output text); do \
+      aws eks describe-nodegroup $aws_p --no-paginate --region $region --cluster $cluster --nodegroup-name $node_pool --query="nodegroup.scalingConfig.desiredSize"; \
+   done; done | paste -s -d+ - | bc
+1
+```
+
+To get a list of all EKS nodes across all regions use:
+
+```bash
+$ for reg in $ec2_r; do \
+   for cluster in $(aws eks list-clusters $aws_p --no-paginate --region $reg --output text --query='clusters'); do \
+      for node_pool in $(aws eks list-nodegroups $aws_p --no-paginate --cluster-name $cluster  --region $reg --query=nodegroups --output text); do \
+         aws eks describe-nodegroup $aws_p --no-paginate --region $reg --cluster $cluster --nodegroup-name $node_pool --query="nodegroup.scalingConfig.desiredSize"; \
+      done; done; done | paste -s -d+ - | bc
+5
+```
