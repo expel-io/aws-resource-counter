@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"io"
 	"math/big"
 	"strings"
@@ -425,21 +426,23 @@ func TestAwsServiceFactoryGetEKSService(t *testing.T) {
 			Session: session,
 		}
 
-		// Get the desired service
-		service := sf.GetEKSService(c.RegionName)
+		t.Run(fmt.Sprintf("testing with region name: %s", c.RegionName), func(t *testing.T) {
+			// Get the desired service
+			service := sf.GetEKSService(c.RegionName)
 
-		// Is the service nil?
-		if service == nil {
-			t.Errorf("No service returned for %s", "GetLightsailService")
-		} else if service.Client != nil {
-			// Convert to implementation type
-			implType, ok := service.Client.(*eks.EKS)
-			if !ok {
-				t.Errorf("Unexpected Client type: expected %v, actual %v", "*eks.EKS", implType)
-			} else if *implType.Config.Region != c.RegionName {
-				t.Errorf("Unexpected value for Client.Config.Region: expected %s, actual %s", c.RegionName, *implType.Config.Region)
+			// Is the service nil?
+			if service == nil {
+				t.Errorf("No service returned for %s", "GetLightsailService")
+			} else if service.Client != nil {
+				// Convert to implementation type
+				implType, ok := service.Client.(*eks.EKS)
+				if !ok {
+					t.Errorf("Unexpected Client type: expected %v, actual %v", "*eks.EKS", implType)
+				} else if *implType.Config.Region != c.RegionName {
+					t.Errorf("Unexpected value for Client.Config.Region: expected %s, actual %s", c.RegionName, *implType.Config.Region)
+				}
 			}
-		}
+		})
 	}
 }
 
@@ -518,11 +521,13 @@ func TestAwsServiceFactoryGetK8Service(t *testing.T) {
 	}
 
 	// Get the desired service
-	service := sf.GetK8Service(cluster, *cluster.Cluster.Endpoint)
+	t.Run("testing k8 creation", func(t *testing.T) {
+		service := sf.GetK8Service(cluster, *cluster.Cluster.Endpoint)
 
-	// Is the service nil?
-	if service == nil {
-		t.Errorf("No service returned for %s", "GetK8Service")
-	}
+		// Is the service nil?
+		if service == nil {
+			t.Errorf("No service returned for %s", "GetK8Service")
+		}
+	})
 
 }
