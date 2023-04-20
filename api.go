@@ -8,8 +8,6 @@ Summary: ServiceFactory, abstract services and the AWS Service Factory implement
 package main
 
 import (
-	"context"
-	"encoding/base64"
 	"fmt"
 	"io"
 
@@ -32,11 +30,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/aws/aws-sdk-go/service/sts/stsiface"
-	k8V1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"sigs.k8s.io/aws-iam-authenticator/pkg/token"
 )
 
 // DefaultRegion is used if the caller does not supply a region
@@ -191,20 +184,17 @@ func (eksi *EKSService) ListClusters(input *eks.ListClustersInput,
 	return eksi.Client.ListClustersPages(input, fn)
 }
 
-// DescribeCluster returns a full description of a Cluster
-func (eksi *EKSService) DescribeCluster(input *eks.DescribeClusterInput) (*eks.DescribeClusterOutput, error) {
-	return eksi.Client.DescribeCluster(input)
+// ListNodeGroups takes an input filter specification and a function
+// to evaluate a ListNodeGroupsOutput struct. The supplied function
+// can determine when to stop iterating through Nodegroups.
+func (eksi *EKSService) ListNodeGroups(input *eks.ListNodegroupsInput,
+	fn func(*eks.ListNodegroupsOutput, bool) bool) error {
+	return eksi.Client.ListNodegroupsPages(input, fn)
 }
 
-// K8Service is a struct that knows how to get a list of all nodes
-// within a cluster
-type K8Service struct {
-	Client kubernetes.Interface
-}
-
-// Returns a list of nodes in a cluster
-func (k8s *K8Service) ListNodes() (*k8V1.NodeList, error) {
-	return k8s.Client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+// DescribeNodegroups returns a full description of a Nodegroup
+func (eksi *EKSService) DescribeNodegroups(input *eks.DescribeNodegroupInput) (*eks.DescribeNodegroupOutput, error) {
+	return eksi.Client.DescribeNodegroup(input)
 }
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -218,7 +208,6 @@ type ServiceFactory interface {
 	GetAccountIDService() *AccountIDService
 	GetEC2InstanceService(string) *EC2InstanceService
 	GetEKSService(string) *EKSService
-	GetK8Service(ClusterFactory, string) *K8Service
 	GetRDSInstanceService(string) *RDSInstanceService
 	GetS3Service() *S3Service
 	GetLambdaService(string) *LambdaService
@@ -418,74 +407,5 @@ func (awssf *AWSServiceFactory) GetEKSService(regionName string) *EKSService {
 
 	return &EKSService{
 		Client: client,
-	}
-}
-
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-// Cluster Factory
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-type ClusterFactory interface {
-	GetToken(*session.Session) (string, error)
-	GetCACert() ([]byte, error)
-}
-
-type EKSCluster struct {
-	Cluster *eks.Cluster
-}
-
-func (c *EKSCluster) GetToken(session *session.Session) (string, error) {
-	gen, err := token.NewGenerator(true, false)
-	if err != nil {
-		return "", err
-	}
-
-	tok, err := gen.GetWithOptions(&token.GetTokenOptions{
-		ClusterID: aws.StringValue(c.Cluster.Name),
-		Session:   session,
-	})
-	if err != nil {
-		return "", err
-	}
-
-	return tok.Token, nil
-}
-
-func (c *EKSCluster) GetCACert() ([]byte, error) {
-	ca, err := base64.StdEncoding.DecodeString(aws.StringValue(c.Cluster.CertificateAuthority.Data))
-	if err != nil {
-		return nil, err
-	}
-
-	return ca, nil
-}
-
-// Create a K8 client
-// Reused code: https://stackoverflow.com/questions/60547409/unable-to-obtain-kubeconfig-of-an-aws-eks-cluster-in-go-code
-func (awssf *AWSServiceFactory) GetK8Service(cf ClusterFactory, clusterEndpoint string) *K8Service {
-	token, err := cf.GetToken(awssf.Session)
-	if err != nil {
-		return nil
-	}
-
-	ca, err := cf.GetCACert()
-	if err != nil {
-		return nil
-	}
-
-	clientset, err := kubernetes.NewForConfig(
-		&rest.Config{
-			Host:        aws.StringValue(&clusterEndpoint),
-			BearerToken: token,
-			TLSClientConfig: rest.TLSClientConfig{
-				CAData: ca,
-			},
-		},
-	)
-	if err != nil {
-		return nil
-	}
-
-	return &K8Service{
-		Client: clientset,
 	}
 }

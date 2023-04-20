@@ -192,11 +192,6 @@ func (fsf fakeLambdaServiceFactory) GetEKSService(regionName string) *EKSService
 	return nil
 }
 
-// Don't need to implement
-func (fsf fakeLambdaServiceFactory) GetK8Service(cf ClusterFactory, clusterEndpoint string) *K8Service {
-	return nil
-}
-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Unit Test for LambdaFunctions
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=

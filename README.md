@@ -128,9 +128,9 @@ As you can see above, no command line arguments were necessary: it used my defau
 Here is what the CSV file looks like. It is important to mention that this tool was run TWICE to collect the results of two different accounts/profiles.
 
 ```csv
-Account ID,Timestamp,Region,# of EC2 Instances,# of Spot Instances,# of EBS Volumes,# of Unique Containers,# of Lambda Functions,# of RDS Instances,# of Lightsail Instances,# of S3 Buckets
-896149672290,2020-10-20T16:29:39-04:00,ALL_REGIONS,2,3,7,3,2,3,2,2
-240520192079,2020-10-21T16:24:06-04:00,ALL_REGIONS,5,4,9,3,12,7,0,13
+Account ID,Timestamp,Region,# of EC2 Instances,# of Spot Instances,# of EBS Volumes,# of Unique Containers,# of Lambda Functions,# of RDS Instances,# of Lightsail Instances,# of S3 Buckets,# of EKS Nodes
+896149672290,2020-10-20T16:29:39-04:00,ALL_REGIONS,2,3,7,3,2,3,2,2,2
+240520192079,2020-10-21T16:24:06-04:00,ALL_REGIONS,5,4,9,3,12,7,0,13,0
 ```
 
 Here are some notes on specific columns:
@@ -223,58 +223,14 @@ To use this utility, this minimal IAM Profile can be associated with a bare user
                 "lightsail:GetRegions",
                 "rds:DescribeDBInstances",
                 "s3:ListAllMyBuckets",
-                "eks:AccessKubernetesApi",
-                "eks:DescribeCluster",
+                "eks:DescribeNodegroup",
+                "eks:ListNodegroups",
                 "eks:ListClusters"
             ],
             "Resource": "*"
         }
     ]
 }
-```
-
-## For EKS Nodes
-
-In order to get counts of nodes within an EKS cluster, you must create a kubernetes cluster role and apply it to an aws user. See [View Kubernetes resource permissions](https://docs.aws.amazon.com/eks/latest/userguide/view-kubernetes-resources.html#view-kubernetes-resources-permissions) for further details.
-
-1. Create this ClusterRole and ClusterRoleBindings file `expel-node-resource-counter.yaml`:
-```
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-   name: expel-node-resource-counter-clusterrole
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - nodes
-  verbs:
-  - get
-  - list
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: expel-node-resource-counter
-subjects:
-- kind: User
-  name: expel-node-resource-counter-user
-roleRef:
-  kind: ClusterRole
-  name: expel-node-resource-counter-clusterrole
-  apiGroup: rbac.authorization.k8s.io
-```
-2. Create the ClusterRole:
-```
-kubectl apply -f expel-node-resource-counter.yaml
-```
-3. Add the mapping to an aws user:
-```
-eksctl create iamidentitymapping \
-   --cluster <your-cluster-name> \
-   --region <your-region> \
-   --arn <your-expel-user-arn> \
-   --username expel-node-resource-counter-user
 ```
 
 ## Resources Counted
@@ -325,6 +281,11 @@ The `aws-resource-counter` examines the following resources:
    * We do not qualify the type of S3 bucket.
    * *NOTE:* We cannot currently count S3 buckets on a per-region basis (due to limitations with the AWS SDK).
    * This is stored in the generated CSV file under the "# of S3 Buckets" column.
+
+1. **EKS Nodes.** We count the number of nodes across all clusters in all regions.
+
+   * We do not qualify the type of EKS node.
+   * This is stored in the generated CSV file under the "# of EKS Nodes" column.
 
 ## Alternative Means of Resource Counting
 
@@ -616,3 +577,29 @@ $ aws s3api list-buckets $aws_p --query 'length(Buckets)'
 ```
 
 Note that it is not possible through the AWS CLI to get S3 buckets on a per-region basis.
+
+
+### EKS Nodes
+
+To get a list of EKS nodes in a given region, we use the AWS CLI `eks` command, as in:
+
+```bash
+$ region=us-east-2
+$ clusters=$(aws eks list-clusters $aws_p --no-paginate --region $region --output text --query='clusters')
+$ for cluster in $clusters; do \
+   for node_pool in $(aws eks list-nodegroups $aws_p --no-paginate --region $region --cluster-name $cluster --query=nodegroups --output text); do \
+      aws eks describe-nodegroup $aws_p --no-paginate --region $region --cluster $cluster --nodegroup-name $node_pool --query="nodegroup.scalingConfig.desiredSize"; \
+   done; done | paste -s -d+ - | bc
+1
+```
+
+To get a list of all EKS nodes across all regions use:
+
+```bash
+$ for reg in $ec2_r; do \
+   for cluster in $(aws eks list-clusters $aws_p --no-paginate --region $reg --output text --query='clusters'); do \
+      for node_pool in $(aws eks list-nodegroups $aws_p --no-paginate --cluster-name $cluster  --region $reg --query=nodegroups --output text); do \
+         aws eks describe-nodegroup $aws_p --no-paginate --region $reg --cluster $cluster --nodegroup-name $node_pool --query="nodegroup.scalingConfig.desiredSize"; \
+      done; done; done | paste -s -d+ - | bc
+5
+```

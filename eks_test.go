@@ -9,15 +9,13 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/eks"
 	"github.com/aws/aws-sdk-go/service/eks/eksiface"
 	"github.com/expel-io/aws-resource-counter/mock"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	testclient "k8s.io/client-go/kubernetes/fake"
 )
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -34,26 +32,20 @@ var fakeEKSClustersSlice = []*eks.ListClustersOutput{
 		},
 	},
 }
-
-var fakeEKSDescribeCluster = &eks.DescribeClusterOutput{
-	Cluster: &eks.Cluster{
-		Name:     aws.String("cluster"),
-		Endpoint: aws.String("endpoint-string"),
+var size = int64(2)
+var fakeEKSDescribeNodeGroup = &eks.DescribeNodegroupOutput{
+	Nodegroup: &eks.Nodegroup{
+		ScalingConfig: &eks.NodegroupScalingConfig{
+			DesiredSize: &size,
+		},
 	},
 }
 
-var fakeNodes = []*v1.Node{
+var fakeEKSNodeGroupSlice = []*eks.ListNodegroupsOutput{
 	{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        "node-1",
-			Namespace:   "default",
-			Annotations: map[string]string{},
-		},
-	}, {
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        "node-2",
-			Namespace:   "default",
-			Annotations: map[string]string{},
+		Nodegroups: []*string{
+			aws.String("nodegroup-1"),
+			aws.String("nodegroup-2"),
 		},
 	},
 }
@@ -68,19 +60,20 @@ var fakeNodes = []*v1.Node{
 type fakeEKService struct {
 	eksiface.EKSAPI
 	LCResponse  []*eks.ListClustersOutput
-	LDCResponse *eks.DescribeClusterOutput
+	DNGResponse *eks.DescribeNodegroupOutput
+	LNGResponse []*eks.ListNodegroupsOutput
 }
 
-func (feks *fakeEKService) DescribeCluster(input *eks.DescribeClusterInput) (*eks.DescribeClusterOutput, error) {
+func (feks *fakeEKService) DescribeNodegroup(input *eks.DescribeNodegroupInput) (*eks.DescribeNodegroupOutput, error) {
 	// If there was no supplied response, then simulate a possible error
-	if feks.LDCResponse == nil {
+	if feks.DNGResponse == nil {
 		return nil, errors.New("ListClusters returns an unexpected error: 2345")
 	}
 
-	return feks.LDCResponse, nil
+	return feks.DNGResponse, nil
 }
 
-// Simulate the ListClustersPagesfunction
+// Simulate the ListClustersPages function
 func (feks *fakeEKService) ListClustersPages(input *eks.ListClustersInput,
 	fn func(*eks.ListClustersOutput, bool) bool) error {
 	// If the supplied response is nil, then simulate an error
@@ -102,6 +95,28 @@ func (feks *fakeEKService) ListClustersPages(input *eks.ListClustersInput,
 	return nil
 }
 
+// Simulate the ListNodegroupsPages function
+func (feks *fakeEKService) ListNodegroupsPages(input *eks.ListNodegroupsInput,
+	fn func(*eks.ListNodegroupsOutput, bool) bool) error {
+	// If the supplied response is nil, then simulate an error
+	if feks.LNGResponse == nil {
+		return errors.New("ListNodeGroups encountered an unexpected error: 1234")
+	}
+
+	// Loop through the slice, invoking the supplied function
+	for index, output := range feks.LNGResponse {
+		// Are we looking at the last "page" of our output?
+		lastPage := index == len(feks.LNGResponse)-1
+
+		// Shall we exit our loop?
+		if cont := fn(output, lastPage); !cont {
+			break
+		}
+	}
+
+	return nil
+}
+
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Fake Service Factory
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -110,8 +125,8 @@ func (feks *fakeEKService) ListClustersPages(input *eks.ListClustersInput,
 // responses (that would come from AWS).
 type fakeEKSServiceFactory struct {
 	LCResponse  []*eks.ListClustersOutput
-	LDCResponse *eks.DescribeClusterOutput
-	Nodes       []*v1.Node
+	DNGResponse *eks.DescribeNodegroupOutput
+	LNGResponse []*eks.ListNodegroupsOutput
 }
 
 // Don't need to implement
@@ -161,17 +176,9 @@ func (fsf fakeEKSServiceFactory) GetEKSService(regionName string) *EKSService {
 	return &EKSService{
 		Client: &fakeEKService{
 			LCResponse:  fsf.LCResponse,
-			LDCResponse: fsf.LDCResponse,
+			DNGResponse: fsf.DNGResponse,
+			LNGResponse: fsf.LNGResponse,
 		},
-	}
-}
-
-func (fsf fakeEKSServiceFactory) GetK8Service(cf ClusterFactory, clusterEndpoint string) *K8Service {
-	if fsf.Nodes == nil {
-		return nil
-	}
-	return &K8Service{
-		Client: testclient.NewSimpleClientset(fsf.Nodes[0], fsf.Nodes[1]),
 	}
 }
 
@@ -182,16 +189,18 @@ func (fsf fakeEKSServiceFactory) GetK8Service(cf ClusterFactory, clusterEndpoint
 func TestEKSNodes(t *testing.T) {
 	// Describe all of our test cases: 1 failure and 1 success
 	cases := []struct {
-		ExpectedCount              int
-		ExpectErrorClusterList     bool
-		ExpectErrorDescribeCluster bool
-		ExpectErrorK8Client        bool
+		ExpectedCount                int
+		ExpectErrorClusterList       bool
+		ExpectErrorDescribeNodegroup bool
+		ExpectErrorNodegroupList     bool
+		name                         string
 	}{
-		// Expected count is 6 because there are 2 nodes defined for each cluster
-		{ExpectedCount: 6},
-		{ExpectErrorClusterList: true},
-		{ExpectErrorDescribeCluster: true},
-		{ExpectErrorK8Client: true},
+		// Expected count is 12 because there are 2 nodes defined for each node pool
+		// each cluster has 2 node pools. so: 2 nodes * 2 node pools * 3 clusters
+		{name: "the expected count is returned", ExpectedCount: 12},
+		{name: "an error is logged for cluster list", ExpectErrorClusterList: true},
+		{name: "an error is logged for describe nodegroup", ExpectErrorDescribeNodegroup: true},
+		{name: "an error is logged for nodegroup list", ExpectErrorNodegroupList: true},
 	}
 
 	// Loop through each test case
@@ -199,43 +208,45 @@ func TestEKSNodes(t *testing.T) {
 		// Construct a ListBucketsOutput object based on whether
 		// we expect an error or not
 		lcResponse := fakeEKSClustersSlice
-		ldcRsponse := fakeEKSDescribeCluster
-		nodes := fakeNodes
+		ldngRsponse := fakeEKSDescribeNodeGroup
+		lngResponse := fakeEKSNodeGroupSlice
 
 		switch {
 		case c.ExpectErrorClusterList:
 			lcResponse = nil
-		case c.ExpectErrorDescribeCluster:
-			ldcRsponse = nil
-		case c.ExpectErrorK8Client:
-			nodes = nil
+		case c.ExpectErrorDescribeNodegroup:
+			ldngRsponse = nil
+		case c.ExpectErrorNodegroupList:
+			lngResponse = nil
 		}
 
 		// Create our fake service factory
 		sf := fakeEKSServiceFactory{
 			LCResponse:  lcResponse,
-			LDCResponse: ldcRsponse,
-			Nodes:       nodes,
+			DNGResponse: ldngRsponse,
+			LNGResponse: lngResponse,
 		}
 
 		// Create a mock activity monitor
 		mon := &mock.ActivityMonitorImpl{}
 
-		// Invoke our EKS Function
-		actualCount := EKSNodes(sf, mon, false)
+		t.Run(fmt.Sprintf("testing %s", c.name), func(t *testing.T) {
+			// Invoke our EKS Function
+			actualCount := EKSNodes(sf, mon, false)
 
-		// Did we expect an error?
-		if c.ExpectErrorK8Client || c.ExpectErrorClusterList || c.ExpectErrorDescribeCluster {
-			// Did it fail to arrive?
-			if !mon.ErrorOccured {
-				t.Error("Expected an error to occur, but it did not... :^(")
+			// Did we expect an error?
+			if c.ExpectErrorNodegroupList || c.ExpectErrorClusterList || c.ExpectErrorDescribeNodegroup {
+				// Did it fail to arrive?
+				if !mon.ErrorOccured {
+					t.Error("Expected an error to occur, but it did not... :^(")
+				}
+			} else if mon.ErrorOccured {
+				t.Errorf("Unexpected error occurred: %s", mon.ErrorMessage)
+			} else if actualCount != c.ExpectedCount {
+				t.Errorf("Error: Nodes returned %d; expected %d", actualCount, c.ExpectedCount)
+			} else if mon.ProgramExited {
+				t.Errorf("Unexpected Exit: The program unexpected exited with status code=%d", mon.ExitCode)
 			}
-		} else if mon.ErrorOccured {
-			t.Errorf("Unexpected error occurred: %s", mon.ErrorMessage)
-		} else if actualCount != c.ExpectedCount {
-			t.Errorf("Error: Nodes returned %d; expected %d", actualCount, c.ExpectedCount)
-		} else if mon.ProgramExited {
-			t.Errorf("Unexpected Exit: The program unexpected exited with status code=%d", mon.ExitCode)
-		}
+		})
 	}
 }

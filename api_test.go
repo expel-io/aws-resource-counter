@@ -1,17 +1,10 @@
 package main
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"fmt"
 	"io"
-	"math/big"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -444,90 +437,4 @@ func TestAwsServiceFactoryGetEKSService(t *testing.T) {
 			}
 		})
 	}
-}
-
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-// Fake Cluster Factory
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
-// This structure simulates the retrieving a token and CA cert for a fake
-// eks cluster.
-type fakeEKSCluster struct {
-	Cluster *eks.Cluster
-}
-
-func (cf fakeEKSCluster) GetToken(session *session.Session) (string, error) {
-	return "fake-token", nil
-}
-
-func (cf fakeEKSCluster) GetCACert() ([]byte, error) {
-	ca := &x509.Certificate{
-		SerialNumber: big.NewInt(2019),
-		Subject: pkix.Name{
-			Organization:  []string{"Company, INC."},
-			Country:       []string{"US"},
-			Province:      []string{""},
-			Locality:      []string{"San Francisco"},
-			StreetAddress: []string{"Golden Gate Bridge"},
-			PostalCode:    []string{"94016"},
-		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().AddDate(10, 0, 0),
-		IsCA:                  true,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-		BasicConstraintsValid: true,
-	}
-
-	caPrivKey, err := rsa.GenerateKey(rand.Reader, 4096)
-	if err != nil {
-		return nil, err
-	}
-
-	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, &caPrivKey.PublicKey, caPrivKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: caBytes,
-	}), nil
-}
-func TestAwsServiceFactoryGetK8Service(t *testing.T) {
-	// Create our test cases
-	testString := "test-cluster"
-
-	cluster := &fakeEKSCluster{
-		Cluster: &eks.Cluster{
-			Name:     &testString,
-			Endpoint: &testString,
-		},
-	}
-
-	// Create a config for the region?
-	var config = &aws.Config{}
-	config = config.WithRegion("")
-
-	// Create our test
-	session, err := session.NewSession(config)
-	if err != nil {
-		t.Errorf("Unexpected error while creating a new session: %v", err)
-	}
-
-	// Create an AWS Service Factory
-	sf := &AWSServiceFactory{
-		Session: session,
-	}
-
-	// Get the desired service
-	t.Run("testing k8 creation", func(t *testing.T) {
-		service := sf.GetK8Service(cluster, *cluster.Cluster.Endpoint)
-
-		// Is the service nil?
-		if service == nil {
-			t.Errorf("No service returned for %s", "GetK8Service")
-		}
-	})
-
 }

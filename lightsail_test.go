@@ -186,11 +186,6 @@ func (fsf fakeLightsailServiceFactory) GetEKSService(regionName string) *EKSServ
 	return nil
 }
 
-// Don't need to implement
-func (fsf fakeLightsailServiceFactory) GetK8Service(cf ClusterFactory, clusterEndpoint string) *K8Service {
-	return nil
-}
-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Unit Test for LightsailInstances
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=

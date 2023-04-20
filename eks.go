@@ -8,7 +8,6 @@ Summary: Provides a count of all EKS nodes.
 package main
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -61,48 +60,54 @@ func eksCountForSingleRegion(region string, sf ServiceFactory, am ActivityMonito
 	eksSvc := sf.GetEKSService(region)
 
 	// Construct our input to find all Clusters
-	input := &eks.ListClustersInput{}
+	clusterInput := &eks.ListClustersInput{}
 
 	nodeCount := 0
-	err := eksSvc.ListClusters(input, func(clusterList *eks.ListClustersOutput, _ bool) bool {
+	err := eksSvc.ListClusters(clusterInput, func(clusterList *eks.ListClustersOutput, _ bool) bool {
 		// Loop through each cluster list
 		for _, cluster := range clusterList.Clusters {
-			// Retrieve cluster info
-			clusterInfo, err := eksSvc.DescribeCluster(&eks.DescribeClusterInput{
-				Name: aws.String(*cluster),
-			})
-
-			// If an error is found, add error message to slice and move onto the next cluster
-			if err != nil {
-				errs = append(errs, fmt.Errorf("unable to retrieve cluster information for %s (%s)", *cluster, err))
-				return true
-			}
-
-			eksCluster := EKSCluster{Cluster: clusterInfo.Cluster}
-
-			// Create the Kubernetes API Client
-			k8Svc := sf.GetK8Service(&eksCluster, *clusterInfo.Cluster.Endpoint)
-			if k8Svc != nil {
-				// Get list of nodes within the cluster
-				nodes, err := k8Svc.ListNodes()
-
-				// If an error is found, add error message to slice and move onto the next cluster
-				if err != nil {
-					errs = append(errs, fmt.Errorf("unable to retrieve nodes in cluster \"%s\" (%s)", *cluster, err))
-					return true
-				}
-
-				nodeCount += len(nodes.Items)
-				continue
-			}
-			errs = append(errs, errors.New("unable to create a Kubernetes client"))
+			count, err := countNodes(eksSvc, cluster)
+			errs = append(errs, err...)
+			nodeCount += count
 		}
-
 		return true
 	})
 
 	if err != nil {
 		errs = append(errs, fmt.Errorf("unable to list clusters for region %s (%s)", region, err))
+	}
+
+	return nodeCount, errs
+}
+
+func countNodes(eksSvc *EKSService, cluster *string) (int, []error) {
+	nodeCount := 0
+	errs := make([]error, 0)
+	nodeGroupsInput := &eks.ListNodegroupsInput{ClusterName: aws.String(*cluster)}
+
+	err := eksSvc.ListNodeGroups(nodeGroupsInput, func(nodeGroupList *eks.ListNodegroupsOutput, _ bool) bool {
+		// Loop through each nodegroup
+		for _, nodeGroup := range nodeGroupList.Nodegroups {
+			describeNodeGroupInput := &eks.DescribeNodegroupInput{
+				ClusterName:   aws.String(*cluster),
+				NodegroupName: aws.String(*nodeGroup),
+			}
+
+			// Retrieve nodegroup info
+			nodeGroupInfo, err := eksSvc.DescribeNodegroups(describeNodeGroupInput)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("unable to describe %s nodegroup (%s)", *nodeGroup, err))
+				return true
+			}
+
+			// Add the node count for the nodepool
+			nodeCount += int(*nodeGroupInfo.Nodegroup.ScalingConfig.DesiredSize)
+		}
+		return true
+	})
+
+	if err != nil {
+		errs = append(errs, fmt.Errorf("unable to list nodegroups for %s cluster (%s)", *cluster, err))
 	}
 
 	return nodeCount, errs

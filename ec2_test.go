@@ -441,11 +441,6 @@ func (fsf fakeEC2ServiceFactory) GetEKSService(regionName string) *EKSService {
 	return nil
 }
 
-// Don't need to implement
-func (fsf fakeEC2ServiceFactory) GetK8Service(cf ClusterFactory, clusterEndpoint string) *K8Service {
-	return nil
-}
-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Unit Test for EC2Counts
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
