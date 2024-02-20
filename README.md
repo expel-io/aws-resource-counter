@@ -185,7 +185,7 @@ If you are using MacOS Catalina, there is a stricter process for running binarie
 
 You can also build this utility directly from source. We have built and tested this with the following Go versions:
 
-* v1.18
+* v1.21
 
 To run from source, use the following command line:
 
