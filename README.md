@@ -2,12 +2,12 @@
 
 ![Build, Lint and Test](https://github.com/expel-io/aws-resource-counter/workflows/Build,%20Lint%20and%20Test/badge.svg?branch=main) ![Release with goreleaser](https://github.com/expel-io/aws-resource-counter/workflows/Release%20with%20goreleaser/badge.svg)
 
-Go utility for counting the resources in use in an AWS organization.
+Command-line utility for counting the resources in use in an AWS organization.
 
 The AWS resource counter utility known as "aws-resource-counter" inspects
 a cloud deployment on Amazon Web Services to assess the number of
-distinct computing resources. The result is a CSV file that describes the counts
-of each.
+distinct compute and storage resources. The result is a CSV file that describes
+the counts of each.
 
 This repository started out as [cloud-resource-counter](https://github.com/expel-io/cloud-resource-counter). Reference the archived repository to view its entire history.
 
@@ -40,32 +40,55 @@ This repository started out as [cloud-resource-counter](https://github.com/expel
   * [Lightsail Instances](#lightsail-instances)
   * [S3 Buckets](#s3-buckets)
 
-## Command Line
+## Prerequisites
 
-This command line tool requires access to a valid AWS Account. It assumes that the credentials for an account are stored in an AWS configuration folder (e.g., `$HOME/.aws`). You may store several sets of credentials, each being denoted by its own "profile name".
+* Access to the AWS accounts from which you want to obtain counts
+(see [Minimal IAM Policy](#minimal-iam-policy) for details)
+* The AWS CLI v2 (see [Installing the AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html)
+for details).
 
-If you omit a profile (or the profile you specify does not contain credentials), this tool will check for AWS environment variables that contain the access key and secret access key. This enables tools such as HashiCorp's Vault to work seamlessly with the tool.
+## Authentication
 
-If you have ever run the AWS CLI, you will already have these profiles configured. This tool uses the same mechanism of retrieving and using stored credentials.
+This command line tool requires access to a valid AWS Account, and uses the same credential mechanisms as the AWS CLI.
+There are several ways to provide credentials. 
 
-### AWS CLI Setup
+### Environment variables
+If you do not specify a profile when running the tool, or the profile you specify does not contain credentials, the
+tool will use the following environment variables. This enables tools such as HashiCorp's Vault to work seamlessly
+with the tool.
 
-If you have not yet stored credentials for your AWS accounts, you must first install the AWS CLI v2 (see [Installing the AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html) for details).
+* AWS_ACCESS_KEY_ID
+* AWS_SECRET_ACCESS_KEY
+* AWS_SESSION_TOKEN
 
-### Saving Credentials in a Profile
+These can be long-lived credentials, or can be short-term credentials obtained from the
+`Command line or programmatic access` section of the AWS SSO account selection page. For a single run of the tool
+using an SSO account, this is the simplest method. Do not pass `--sso` to the tool if you use this method, even
+if the environment variables are short-term credentials created by an SSO account.
 
-If you already have AWS CLI installed, you would simply run:
+### Credential profiles
+If you have ever run the AWS CLI, you will already have at least one profile configured. This tool uses the same
+mechanism of retrieving and using stored credentials. You may store several sets of credentials, each being denoted
+by its own "profile name".
+
+To create a new profile, run:
 
 ```bash
 $ aws configure --profile some-profile-name
 AWS Access Key ID [None]: ...
 ```
 
-where `some-profile-name` is the name you would like to use to name this set of credentials. You would be prompted for several strings (AWS Access Key ID, AWS Secret Access Key, Default region name, Default output format).
+where `some-profile-name` is the name you would like to use to name this set of credentials. You would be prompted for
+several strings (AWS Access Key ID, AWS Secret Access Key, Default region name, Default output format).
 
 For help on storing AWS credentials, see [Configuration Basics](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-quickstart.html).
 
-### Using aws-resource-counter
+### On-demand SSO access
+To use an SSO-enabled account without copying short-term credentials into an environment variable,
+see [Configure the AWS CLI to use AWS IAM Identity Center](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sso.html).
+Pass `--sso` to the aws-resource-counter tool when you run it.
+
+## Using aws-resource-counter
 
 The following command line arguments are supported:
 
@@ -183,7 +206,7 @@ If you are using MacOS Catalina, there is a stricter process for running binarie
 
 ## Building from Source
 
-You can also build this utility directly from source. We have built and tested this with the following Go versions:
+`aws-resource-counter` is written in Go. You can build and run it directly from source. We have built and tested this with the following Go versions:
 
 * v1.21
 
