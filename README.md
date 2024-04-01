@@ -133,6 +133,7 @@ Cloud Resource Counter (v0.7.0) running with:
 Activity
  * Retrieving Account ID...OK (240520192079)
  * Retrieving EC2 counts...................OK (5)
+ * Retrieving EC2 K8 related VMs Sub-instance counts...................OK (1)
  * Retrieving Spot instance counts...................OK (4)
  * Retrieving EBS volume counts...................OK (9)
  * Retrieving Unique container counts...................OK (3)
@@ -151,7 +152,7 @@ As you can see above, no command line arguments were necessary: it used my defau
 Here is what the CSV file looks like. It is important to mention that this tool was run TWICE to collect the results of two different accounts/profiles.
 
 ```csv
-Account ID,Timestamp,Region,# of EC2 Instances,# of Spot Instances,# of EBS Volumes,# of Unique Containers,# of Lambda Functions,# of RDS Instances,# of Lightsail Instances,# of S3 Buckets,# of EKS Nodes
+Account ID,Timestamp,Region,# of EC2 Instances,# of EC2 K8 related VMs Sub-instances,# of Spot Instances,# of EBS Volumes,# of Unique Containers,# of Lambda Functions,# of RDS Instances,# of Lightsail Instances,# of S3 Buckets,# of EKS Nodes
 896149672290,2020-10-20T16:29:39-04:00,ALL_REGIONS,2,3,7,3,2,3,2,2,2
 240520192079,2020-10-21T16:24:06-04:00,ALL_REGIONS,5,4,9,3,12,7,0,13,0
 ```
@@ -267,6 +268,7 @@ The `aws-resource-counter` examines the following resources:
 1. **EC2**. We count the number of EC2 **running** instances (both "normal" and Spot instances) across all regions.
 
    * For EC2 instances, we only count those _without_ an Instance Lifecycle tag (which is either `spot` or `scheduled`).
+   * For EC2 K8 related VMs sub-instances, we only count those with a tag of `aws:eks:cluster-name`.
    * For Spot instance, we only count those with an Instance Lifecycle tag of `spot`.
 
    * This is stored in the generated CSV file under the "# of EC2 Instances" and "# of Spot Instances" columns.
@@ -348,7 +350,7 @@ To collect the total number of EC2 instances across all regions, we will need to
 ```bash
 $ aws ec2 describe-regions $aws_p \
    --filters Name=opt-in-status,Values=opt-in-not-required,opted-in \
-   --region us-east-1 --output text --query Regions[].RegionName
+   --region us-east-1 --output text --query 'Regions[].RegionName'
 eu-north-1    ap-south-1    eu-west-3 ...
 ```
 
@@ -364,7 +366,7 @@ We will be using the results of this command to "iterate" over all regions. To m
 ```bash
 $ ec2_r=$(aws ec2 describe-regions $aws_p \
    --filters Name=opt-in-status,Values=opt-in-not-required,opted-in \
-   --region us-east-1 --output text --query Regions[].RegionName )
+   --region us-east-1 --output text --query 'Regions[].RegionName' )
 ```
 
 You can show the list of regions for your account by using the `echo` command:
@@ -416,6 +418,32 @@ The first line loops over all regions (using the variable `reg` to hold the curr
 The second and third lines are our call to `describe-instances` (as shown above).
 
 In the fourth line, we paste all of the values into a long addition and use `bc` to sum the values.
+
+#### EC2 K8 Related VMs Subcount Instances
+
+Here is the command to count the number of _EC K8 related VMs subcount_ instances for a given region:
+
+```bash
+$ aws ec2 describe-instances $aws_p --no-paginate --region us-east-1 \
+      --filters Name=instance-state-name,Values=running \
+      --filters Name=tag-key,Values='aws:eks:cluster-name' \
+      --query 'length(Reservations[].Instances[?!not_null(InstanceLifecycle)].InstanceId[])'
+1
+```
+
+This command is similar to the normal EC2 query, but now explicitly checks for EC2 instances whose `Tags` have that key `aws:eks:cluster-name`.
+
+We will need to run this command over all regions. Here is what it looks like:
+
+```bash
+$ for reg in $ec2_r; do \
+   aws ec2 describe-instances $aws_p --no-paginate --region $reg \
+      --filters Name=instance-state-name,Values=running \
+      --filters Name=tag-key,Values='aws:eks:cluster-name' \
+      --query 'length(Reservations[].Instances[?!not_null(InstanceLifecycle)].InstanceId[])' ; \
+done | paste -s -d+ - | bc
+5
+```
 
 #### Spot Instances
 
