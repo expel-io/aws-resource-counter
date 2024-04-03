@@ -30,7 +30,6 @@ var date string = "<<never built>>"
 //
 // This command requires access to a valid AWS Account. For now, it is assumed that
 // this is stored in the user's ".aws" folder (located in $HOME/.aws).
-//
 func main() {
 	/* =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 	 * Command line processing
@@ -92,6 +91,7 @@ func main() {
 	results.Append("Timestamp", time.Now().Format(time.RFC3339))
 	results.Append("Region", displayRegion)
 	results.Append("# of EC2 Instances", EC2Counts(serviceFactory, monitor, settings.allRegions))
+	results.Append("# of EC2 K8 related VMs Sub-instances", EC2K8SubInstances(serviceFactory, monitor, settings.allRegions))
 	results.Append("# of Spot Instances", SpotInstances(serviceFactory, monitor, settings.allRegions))
 	results.Append("# of EBS Volumes", EBSVolumes(serviceFactory, monitor, settings.allRegions))
 	results.Append("# of Unique Containers", UniqueContainerImages(serviceFactory, monitor, settings.allRegions))

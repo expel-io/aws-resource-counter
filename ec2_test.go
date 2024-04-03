@@ -10,6 +10,7 @@ package main
 import (
 	"errors"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -50,7 +51,7 @@ var ec2Regions *ec2.DescribeRegionsOutput = &ec2.DescribeRegionsOutput{
 // This is our map of regions and the instances in each
 var ec2InstancesPerRegion = map[string][]*ec2.DescribeInstancesOutput{
 	// US-EAST-1 illustrates a case where DescribeInstancesPages returns two pages of results.
-	// First page: 2 different reservations (1 running instance, then 2 instances [1 is spot])
+	// First page: 2 different reservations (1 running instance, then 3 instances [1 is k8 related vm, 1 is a spot instance])
 	// Second page: 1 reservation (2 instances, 1 of which is stopped)
 	"us-east-1": {
 		&ec2.DescribeInstancesOutput{
@@ -67,6 +68,14 @@ var ec2InstancesPerRegion = map[string][]*ec2.DescribeInstancesOutput{
 				{
 					Instances: []*ec2.Instance{
 						{
+							State: &ec2.InstanceState{
+								Name: aws.String("running"),
+							},
+						},
+						{
+							Tags: []*ec2.Tag{
+								{Key: aws.String("aws:eks:cluster-name"), Value: aws.String("cluster-name")},
+							},
 							State: &ec2.InstanceState{
 								Name: aws.String("running"),
 							},
@@ -276,13 +285,26 @@ func instanceSatisfiesFilter(reflectStruct reflect.Value, filter *ec2.Filter) bo
 
 	// Get our field value from the path
 	fieldValue, ok := resolvePathByReflection(reflectStruct, fieldNamePath)
-	if !ok {
+	if !ok && !slices.Contains(fieldNamePath, "TagKey") {
 		return false
 	}
 
 	// Does this match one of the filter values?
 	for _, value := range filter.Values {
-		// Does it match?
+		// if we get a filter for "tag-key", check the "Tags" portion of an ec2 instance
+		// loop through the tags slice checking each of the "Kay" values in the tags struct
+		// return true if we find any matching values
+		if slices.Contains(fieldNamePath, "TagKey") {
+			tags := reflectStruct.FieldByName("Tags")
+			if !tags.IsValid() || tags.IsNil() || tags.Kind() != reflect.Slice {
+				return false
+			}
+			for i := 0; i < tags.Len(); i++ {
+				if tagKey := tags.Index(i).Elem().FieldByName("Key").Elem(); tagKey.IsValid() && tagKey.Kind() == reflect.String && tagKey.String() == *value {
+					return true
+				}
+			}
+		}
 		if *value == fieldValue {
 			return true
 		}
@@ -455,7 +477,7 @@ func TestEC2Counts(t *testing.T) {
 	}{
 		{
 			RegionName:    "us-east-1",
-			ExpectedCount: 3,
+			ExpectedCount: 4,
 		}, {
 			RegionName:    "us-east-2",
 			ExpectedCount: 5,
@@ -467,7 +489,7 @@ func TestEC2Counts(t *testing.T) {
 			ExpectError: true,
 		}, {
 			AllRegions:    true,
-			ExpectedCount: 8,
+			ExpectedCount: 9,
 		},
 	}
 
