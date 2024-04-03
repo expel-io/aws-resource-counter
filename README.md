@@ -271,7 +271,7 @@ The `aws-resource-counter` examines the following resources:
    * For EC2 K8 related VMs sub-instances, we only count those with a tag of `aws:eks:cluster-name`.
    * For Spot instance, we only count those with an Instance Lifecycle tag of `spot`.
 
-   * This is stored in the generated CSV file under the "# of EC2 Instances" and "# of Spot Instances" columns.
+   * This is stored in the generated CSV file under the "# of EC2 Instances", "# of EC2 K8 related VMs Sub-instances", and "# of Spot Instances" columns.
 
 1. **EBS Volumes.** We count the number of "attached" EBS volumes across all regions.
 
