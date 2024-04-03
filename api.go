@@ -30,6 +30,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/aws/aws-sdk-go/service/sts/stsiface"
+	"github.com/aws/aws-sdk-go/service/iam"
+    "github.com/aws/aws-sdk-go/service/iam/iamiface"
 )
 
 // DefaultRegion is used if the caller does not supply a region
@@ -92,6 +94,24 @@ func (ec2i *EC2InstanceService) GetRegions(input *ec2.DescribeRegionsInput) (*ec
 func (ec2i *EC2InstanceService) InspectVolumes(input *ec2.DescribeVolumesInput,
 	fn func(*ec2.DescribeVolumesOutput, bool) bool) error {
 	return ec2i.Client.DescribeVolumesPages(input, fn)
+}
+
+// IAMService is a struct that knows how to get the
+// list of IAM users using an object that implements the IAM API interface.
+type IAMService struct {
+    Client iamiface.IAMAPI
+}
+
+// ListUsers wraps the ListUsers method of the IAM API.
+func (s *IAMService) ListUsers(input *iam.ListUsersInput) (*iam.ListUsersOutput, error) {
+    return s.Client.ListUsers(input)
+}
+
+// Add to AWSServiceFactory to include a method for getting an IAMService instance
+func (awssf *AWSServiceFactory) GetIAMService() *IAMService {
+    return &IAMService{
+        Client: iam.New(awssf.Session),
+    }
 }
 
 // RDSInstanceService is a struct that knows how to get the
@@ -213,6 +233,7 @@ type ServiceFactory interface {
 	GetLambdaService(string) *LambdaService
 	GetContainerService(string) *ContainerService
 	GetLightsailService(string) *LightsailService
+	GetIAMService() *IAMService
 }
 
 // AWSServiceFactory is a struct that holds a reference to

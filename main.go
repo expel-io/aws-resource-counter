@@ -100,6 +100,7 @@ func main() {
 	results.Append("# of Lightsail Instances", LightsailInstances(serviceFactory, monitor, settings.allRegions))
 	results.Append("# of S3 Buckets", S3Buckets(serviceFactory, monitor, settings.allRegions))
 	results.Append("# of EKS Nodes", EKSNodes(serviceFactory, monitor, settings.allRegions))
+	results.Append("# of IAM Users", IAMUserCounts(serviceFactory, monitor))
 
 	/* =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 	 * Construct CSV Output
