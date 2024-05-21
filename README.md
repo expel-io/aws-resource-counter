@@ -55,7 +55,8 @@ There are several ways to provide credentials.
 ### Environment variables
 If you do not specify a profile when running the tool, or the profile you specify does not contain credentials, the
 tool will use the following environment variables. This enables tools such as HashiCorp's Vault to work seamlessly
-with the tool.
+with the tool. <br/>
+**These environment variables will not be utilized if you have a default profile configured. You must remove the default profile in order to utilize theses environment variables within this script.**
 
 * AWS_ACCESS_KEY_ID
 * AWS_SECRET_ACCESS_KEY
