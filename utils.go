@@ -8,12 +8,15 @@ Summary: Various utility functions
 package main
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"reflect"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/endpoints"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
 // OpenFileForWriting does stuff...
@@ -39,12 +42,12 @@ func OpenFileForWriting(fileName string, typeOfFile string, am ActivityMonitor, 
 func GetEC2Regions(ec2is *EC2InstanceService, am ActivityMonitor) []string {
 	// Construct the input
 	input := &ec2.DescribeRegionsInput{
-		Filters: []*ec2.Filter{
+		Filters: []types.Filter{
 			{
 				Name: aws.String("opt-in-status"),
-				Values: []*string{
-					aws.String("opt-in-not-required"),
-					aws.String("opted-in"),
+				Values: []string{
+					"opt-in-not-required",
+					"opted-in",
 				},
 			},
 		},
@@ -68,19 +71,28 @@ func GetEC2Regions(ec2is *EC2InstanceService, am ActivityMonitor) []string {
 }
 
 // IsValidRegionName returns whether the supplied region name is valid or not.
-func IsValidRegionName(regionName string) bool {
-	// Get the AWS Partition
-	awsPartition := endpoints.AwsPartition()
+func IsValidRegionName(ctx context.Context, regionName string) (bool, error) {
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	svc := ec2.NewFromConfig(cfg)
+
+	resp, err := svc.DescribeRegions(ctx, &ec2.DescribeRegionsInput{})
+	if err != nil {
+		return false, fmt.Errorf("failed to describe regions, %v", err)
+	}
 
 	// Loop through the region names...
-	for id := range awsPartition.Regions() {
+	for _, region := range resp.Regions {
 		// Does it match?
-		if id == regionName {
-			return true
+		if *region.RegionName == regionName {
+			return true, nil
 		}
 	}
 
-	return false
+	return false, nil
 }
 
 // Map applies a function to each element of a string array

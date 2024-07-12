@@ -9,6 +9,7 @@ Summary: Retrieve account ID (assumed to be a single value) for the current
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 
@@ -42,14 +43,14 @@ type CommandLineSettings struct {
 // Process inspects the command line for valid arguments.
 //
 // Usage of aws-resource-counter
-//   --sso:            Use SSO for authentication
-//   --output-file OF: Write the results to file OF. Defaults to 'resources.csv'
-//   --no-output:      If set, then the results are not saved to any file.
-//   --profile PN:     Use the credentials associated with shared profile PN
-//   --region RN:      View resource counts for the AWS region RN
-//   --trace-file TF:  Create a trace file that contains all calls to AWS.
-//   --version:        Display version information
 //
+//	--sso:            Use SSO for authentication
+//	--output-file OF: Write the results to file OF. Defaults to 'resources.csv'
+//	--no-output:      If set, then the results are not saved to any file.
+//	--profile PN:     Use the credentials associated with shared profile PN
+//	--region RN:      View resource counts for the AWS region RN
+//	--trace-file TF:  Create a trace file that contains all calls to AWS.
+//	--version:        Display version information
 func (cls *CommandLineSettings) Process(args []string, am ActivityMonitor) func() {
 	var showVersion bool
 	emptyFn := func() {}
@@ -72,10 +73,14 @@ func (cls *CommandLineSettings) Process(args []string, am ActivityMonitor) func(
 	flagSet.BoolVar(&showVersion, "version", false, "Shows the version number.")
 	flagSet.Parse(args)
 
+	ctx := context.Background()
+
 	// Check for a valid AWS Region
 	if cls.regionName != "" {
 		// If not valid region name, then get out now...
-		if !IsValidRegionName(cls.regionName) {
+		if valid, err := IsValidRegionName(ctx, cls.regionName); err != nil {
+			am.ActionError("Error: %s", err.Error())
+		} else if !valid {
 			am.ActionError("Error: '%s' is not a valid AWS Region name.", cls.regionName)
 			return emptyFn
 		}

@@ -8,28 +8,29 @@ Summary: ServiceFactory, abstract services and the AWS Service Factory implement
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
-	"github.com/aws/aws-sdk-go/service/ecs"
-	"github.com/aws/aws-sdk-go/service/ecs/ecsiface"
-	"github.com/aws/aws-sdk-go/service/eks"
-	"github.com/aws/aws-sdk-go/service/eks/eksiface"
-	"github.com/aws/aws-sdk-go/service/lambda"
-	"github.com/aws/aws-sdk-go/service/lambda/lambdaiface"
-	"github.com/aws/aws-sdk-go/service/lightsail"
-	"github.com/aws/aws-sdk-go/service/lightsail/lightsailiface"
-	"github.com/aws/aws-sdk-go/service/rds"
-	"github.com/aws/aws-sdk-go/service/rds/rdsiface"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
-	"github.com/aws/aws-sdk-go/service/sts"
-	"github.com/aws/aws-sdk-go/service/sts/stsiface"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2/ec2iface"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/ecs/ecsiface"
+	"github.com/aws/aws-sdk-go-v2/service/eks"
+	"github.com/aws/aws-sdk-go-v2/service/eks/eksiface"
+	"github.com/aws/aws-sdk-go-v2/service/lambda"
+	"github.com/aws/aws-sdk-go-v2/service/lambda/lambdaiface"
+	"github.com/aws/aws-sdk-go-v2/service/lightsail"
+	"github.com/aws/aws-sdk-go-v2/service/lightsail/lightsailiface"
+	"github.com/aws/aws-sdk-go-v2/service/rds"
+	"github.com/aws/aws-sdk-go-v2/service/rds/rdsiface"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/s3iface"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/aws-sdk-go-v2/service/sts/stsiface"
+	"github.com/aws/smithy-go/logging"
 )
 
 // DefaultRegion is used if the caller does not supply a region
@@ -221,7 +222,7 @@ type ServiceFactory interface {
 // It also accepts a profile name, overriding region and file
 // to use to send trace information.
 type AWSServiceFactory struct {
-	Session     *session.Session
+	Config      *config.Config
 	ProfileName string
 	RegionName  string
 	TraceWriter io.Writer
@@ -232,59 +233,55 @@ type AWSServiceFactory struct {
 // initial AWS Session object (pointer). It inspects the profiles
 // in the current user's directories and prepares the session for
 // tracing (if requested).
-func (awssf *AWSServiceFactory) Init() {
-	config := &aws.Config{}
+func (awssf *AWSServiceFactory) Init(ctx context.Context) error {
+	configOptions := []config.LoadOptionsFunc{}
+
+	// config := &aws.Config{}
 
 	// Was a region specified by the user?
 	if awssf.RegionName != "" {
 		// Add it to the configuration
-		config = config.WithRegion(awssf.RegionName)
+		configOptions = append(configOptions, config.WithRegion(awssf.RegionName))
 	}
 
 	// Was tracing specified by the user?
 	if awssf.TraceWriter != nil {
 		// Enable logging of AWS Calls with Body
-		config = config.WithLogLevel(aws.LogDebugWithHTTPBody)
+		configOptions = append(configOptions, config.WithLogConfigurationWarnings(true))
 
 		// Enable a logger function which writes to the Trace file
-		config = config.WithLogger(aws.LoggerFunc(func(args ...interface{}) {
+		traceLogger := logging.LoggerFunc(func(classification logging.Classification, format string, args ...interface{}) {
 			fmt.Fprintln(awssf.TraceWriter, args...)
-		}))
+		})
+
+		configOptions = append(configOptions, config.WithLogger(traceLogger))
 	}
 
-	// Construct our session Options object
-	options := session.Options{
-		Config: *config,
+	configOptions = append(configOptions, config.WithSharedConfigProfile(awssf.ProfileName))
+
+	cfg, err := config.LoadDefaultConfig(
+		ctx,
+		configOptions...,
+	)
+	if err != nil {
+		return err
 	}
 
-	// options to set if using SSO
-	if awssf.UseSSO {
-		options.SharedConfigState = session.SharedConfigEnable
-		options.Profile = awssf.ProfileName
-	} else {
-		// Create an initial configuration object which defines our chain
-		// of credentials providers: first, honor a supplied profile name,
-		// if that fails, look for the environment variables.
-		options.Config.Credentials = credentials.NewChainCredentials(
-			[]credentials.Provider{
-				&credentials.SharedCredentialsProvider{
-					Profile: awssf.ProfileName,
-				},
-				&credentials.EnvProvider{},
-			},
-		)
-	}
+	// // Construct our session Options object
+	// options := session.Options{
+	// 	Config: *config,
+	// }
 
-	// Ensure that we have a session
-	sess := session.Must(session.NewSessionWithOptions(options))
+	// // Ensure that we have a session
+	// sess := session.Must(config.NewSessionWithOptions(options))
 
-	// Does this session have a region? If not, use the default region
-	if *sess.Config.Region == "" {
-		sess = sess.Copy(&aws.Config{Region: aws.String(DefaultRegion)})
-	}
+	// // Does this session have a region? If not, use the default region
+	// if *sess.Config.Region == "" {
+	// 	sess = sess.Copy(&aws.Config{Region: aws.String(DefaultRegion)})
+	// }
 
-	// Store the session in our struct
-	awssf.Session = sess
+	// // Store the session in our struct
+	// awssf.Session = sess
 }
 
 // GetCurrentRegion returns the name of the current region.
